@@ -5,5 +5,6 @@ const protectRoute = require("../middleware/authMiddleware");
 
 router.post("/scan", protectRoute, driveFilesController.scanDriveFiles);
 router.get("/list", protectRoute, driveFilesController.listDriveFiles);
+router.post("/emptyTrash",protectRoute,driveFilesController.emptyTrash);
 
 module.exports = router;

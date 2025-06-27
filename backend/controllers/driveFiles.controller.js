@@ -130,7 +130,30 @@ const listDriveFiles = async (req, res) => {
   }
 };
 
+const emptyTrash=async(req,res)=>{
+  try {
+    const user=req.user;
+    if(!user.google_tokens){
+      return res.status(400).json({ error: "Google Drive not connected" });
+    }
+
+    const auth=new google.auth.OAuth2();
+    auth.setCredentials(user.google_tokens);
+    const drive = google.drive({ version: "v3", auth });
+
+    await drive.files.emptyTrash();
+    console.log(`🗑️ Trash emptied for user: ${user.email}`);
+
+    res.status(200).json({ message: "Trash emptied successfully." });
+
+  } catch (error) {
+    console.error("❌ Failed to empty trash:", error.message);
+    res.status(500).json({ error: "Failed to empty Drive trash" });
+  }
+};
+
 module.exports = {
   scanDriveFiles,
   listDriveFiles,
+  emptyTrash
 };

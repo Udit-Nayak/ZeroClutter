@@ -8,16 +8,16 @@ exports.getDuplicateFiles = async (req, res) => {
   try {
     const user = req.user;
     const query = `
-  SELECT 
-    MIN(file_id) AS file_id,
-    name,
-    size,
-    COUNT(*) AS duplicate_count
-  FROM drive_files
-  WHERE user_id = $1
-  GROUP BY name, size
-  HAVING COUNT(*) > 1;
-`;
+      SELECT 
+      MIN(file_id) AS file_id,
+      name,
+      size,
+      COUNT(*) AS duplicate_count
+      FROM drive_files
+      WHERE user_id = $1
+      GROUP BY name, size
+      HAVING COUNT(*) > 1;
+    `;
 
     const result = await pool.query(query, [user.id]);
     res.status(200).json(result.rows);
@@ -78,8 +78,12 @@ exports.deleteDuplicates = async (req, res) => {
           continue;
         }
 
-        await drive.files.delete({ fileId: file.file_id });
+        await drive.files.update({
+          fileId: file.file_id,
+          requestBody: { trashed: true },
+        });
         console.log(`✅ Deleted from Drive: ${file.file_id}`);
+        console.log(`🗑️ Moved to Trash: ${file.file_id}`);
         deletedCount++;
 
         await pool.query(

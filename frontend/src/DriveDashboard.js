@@ -33,10 +33,14 @@ function DriveDashboard() {
       setIsDuplicateMode(duplicateOnly);
 
       if (!duplicateOnly) {
-      await axios.post("http://localhost:5000/api/driveFiles/scan", {}, {
-        headers: { Authorization: `Bearer ${authToken}` },
-      });
-    }
+        await axios.post(
+          "http://localhost:5000/api/driveFiles/scan",
+          {},
+          {
+            headers: { Authorization: `Bearer ${authToken}` },
+          }
+        );
+      }
 
       const query = duplicateOnly
         ? ""
@@ -87,32 +91,50 @@ function DriveDashboard() {
   };
 
   const handleDeleteDuplicate = async (name, size) => {
-  try {
-    setLoading(true);
+    try {
+      setLoading(true);
 
-    await axios.post(
-      "http://localhost:5000/api/duplicates/delete",
-      { name, size },
-      {
-        headers: { Authorization: `Bearer ${token}` },
-      }
-    );
+      await axios.post(
+        "http://localhost:5000/api/duplicates/delete",
+        { name, size },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
 
-    // Update the frontend table by filtering out the deleted group
-    setFiles((prevFiles) =>
-      prevFiles.filter(
-        (file) => !(file.name === name && Number(file.size) === Number(size))
-      )
-    );
-  } catch (err) {
-    console.error("Failed to delete duplicates:", err);
-    setError("Failed to delete duplicates");
-  } finally {
-    setLoading(false);
-  }
-};
+      // Update the frontend table by filtering out the deleted group
+      setFiles((prevFiles) =>
+        prevFiles.filter(
+          (file) => !(file.name === name && Number(file.size) === Number(size))
+        )
+      );
+    } catch (err) {
+      console.error("Failed to delete duplicates:", err);
+      setError("Failed to delete duplicates");
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  const handleEmptyTrash = async () => {
+    try {
+      setLoading(true);
+      setError("");
 
+      await axios.post(
+        "http://localhost:5000/api/driveFiles/emptyTrash",
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      alert("Trash emptied successfully!");
+    } catch (err) {
+      console.error("Failed to empty trash:", err);
+      setError("Failed to empty trash");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div style={{ padding: "2rem" }}>
@@ -126,8 +148,16 @@ function DriveDashboard() {
           >
             List Files
           </button>
-          <button onClick={() => fetchDriveFiles(token, true)}>
+          <button 
+            onClick={() => fetchDriveFiles(token, true)}
+            style={{ marginRight: "1rem" }}>
             Show Duplicates
+          </button>
+          <button
+            onClick={handleEmptyTrash}
+            style={{ marginRight: "1rem"  }}
+          >
+            Empty Trash
           </button>
         </div>
       )}
@@ -170,7 +200,11 @@ function DriveDashboard() {
       ) : files.length === 0 && isAuthenticated ? (
         <p>No files found.</p>
       ) : (
-        <FileTree nodes={files} showDuplicates={isDuplicateMode} onDeleteDuplicate={handleDeleteDuplicate}/>
+        <FileTree
+          nodes={files}
+          showDuplicates={isDuplicateMode}
+          onDeleteDuplicate={handleDeleteDuplicate}
+        />
       )}
     </div>
   );
