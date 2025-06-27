@@ -32,6 +32,12 @@ function DriveDashboard() {
       setError("");
       setIsDuplicateMode(duplicateOnly);
 
+      if (!duplicateOnly) {
+      await axios.post("http://localhost:5000/api/driveFiles/scan", {}, {
+        headers: { Authorization: `Bearer ${authToken}` },
+      });
+    }
+
       const query = duplicateOnly
         ? ""
         : new URLSearchParams(filters).toString();
@@ -79,6 +85,34 @@ function DriveDashboard() {
   const handleChange = (e) => {
     setFilters({ ...filters, [e.target.name]: e.target.value });
   };
+
+  const handleDeleteDuplicate = async (name, size) => {
+  try {
+    setLoading(true);
+
+    await axios.post(
+      "http://localhost:5000/api/duplicates/delete",
+      { name, size },
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+
+    // Update the frontend table by filtering out the deleted group
+    setFiles((prevFiles) =>
+      prevFiles.filter(
+        (file) => !(file.name === name && Number(file.size) === Number(size))
+      )
+    );
+  } catch (err) {
+    console.error("Failed to delete duplicates:", err);
+    setError("Failed to delete duplicates");
+  } finally {
+    setLoading(false);
+  }
+};
+
+
 
   return (
     <div style={{ padding: "2rem" }}>
@@ -136,7 +170,7 @@ function DriveDashboard() {
       ) : files.length === 0 && isAuthenticated ? (
         <p>No files found.</p>
       ) : (
-        <FileTree nodes={files} showDuplicates={isDuplicateMode} />
+        <FileTree nodes={files} showDuplicates={isDuplicateMode} onDeleteDuplicate={handleDeleteDuplicate}/>
       )}
     </div>
   );

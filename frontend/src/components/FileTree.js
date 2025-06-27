@@ -9,7 +9,7 @@ const formatSize = (bytes) => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + " " + sizes[i];
 };
 
-const FileTree = ({ nodes, showDuplicates }) => {
+const FileTree = ({ nodes, showDuplicates,onDeleteDuplicate  }) => {
   if (!nodes || nodes.length === 0) return <p>No files to display.</p>;
 
   // Show duplicates as table
@@ -21,26 +21,43 @@ const FileTree = ({ nodes, showDuplicates }) => {
             <th style={styles.header}>Name</th>
             <th style={styles.header}>Size</th>
             <th style={styles.header}>No. of Copies</th>
+            <th style={styles.header}>Actions</th>
           </tr>
         </thead>
         <tbody>
-          {nodes.map((node) => (
-            <tr key={node.file_id}>
-              <td style={styles.cell}>
-                <a
-                  href={`https://drive.google.com/file/d/${node.file_id}/view`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ color: "blue", textDecoration: "none" }}
-                >
-                  {node.name}
-                </a>
-              </td>
-              <td style={styles.cell}>{formatSize(node.size)}</td>
-              <td style={styles.cell}>{node.duplicate_count}</td>
-            </tr>
-          ))}
-        </tbody>
+  {nodes.map((node) => (
+    <tr key={node.file_id}>
+      <td style={styles.cell}>
+        <a
+          href={`https://drive.google.com/file/d/${node.file_id}/view`}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ color: "blue", textDecoration: "none" }}
+        >
+          {node.name}
+        </a>
+      </td>
+      <td style={styles.cell}>{formatSize(node.size)}</td>
+      <td style={styles.cell}>{node.duplicate_count}</td>
+      <td style={styles.cell}>
+        <button
+          onClick={() => onDeleteDuplicate(node.name, node.size)}
+          style={{
+            padding: "4px 8px",
+            backgroundColor: "#dc3545",
+            color: "#fff",
+            border: "none",
+            borderRadius: "4px",
+            cursor: "pointer",
+          }}
+        >
+          Delete Duplicates
+        </button>
+      </td>
+    </tr>
+  ))}
+</tbody>
+
       </table>
     );
   }

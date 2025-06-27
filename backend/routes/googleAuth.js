@@ -7,55 +7,61 @@ const pool = require("../db");
 const router = express.Router();
 
 router.get("/login", (req, res) => {
-const oauth2Client = getOAuth2Client();
-const url = oauth2Client.generateAuthUrl({
-access_type: "offline",
-prompt: "consent",
-scope: [
-"https://www.googleapis.com/auth/userinfo.email",
-"https://www.googleapis.com/auth/drive.readonly",
-],
-});
-res.redirect(url);
+  const oauth2Client = getOAuth2Client();
+  const url = oauth2Client.generateAuthUrl({
+    access_type: "offline",
+    prompt: "consent", // <-- FORCE user to approve again
+    scope: [
+      "https://www.googleapis.com/auth/drive", // FULL access to delete files
+      "https://www.googleapis.com/auth/userinfo.email",
+      "https://www.googleapis.com/auth/userinfo.profile",
+      "openid",
+    ],
+  });
+
+  res.redirect(url);
 });
 
 router.get("/callback", async (req, res) => {
-try {
-const code = req.query.code;
-const oauth2Client = getOAuth2Client();
-const { tokens } = await oauth2Client.getToken(code);
-oauth2Client.setCredentials(tokens);
-const oauth2 = google.oauth2({
-  auth: oauth2Client,
-  version: "v2",
-});
+  try {
+    const code = req.query.code;
+    const oauth2Client = getOAuth2Client();
+    const { tokens } = await oauth2Client.getToken(code);
+    console.log("🔐 Scopes granted by user:", tokens.scope);
 
-const userInfo = await oauth2.userinfo.get();
-const email = userInfo.data.email;
+    oauth2Client.setCredentials(tokens);
+    const oauth2 = google.oauth2({
+      auth: oauth2Client,
+      version: "v2",
+    });
 
-const result = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
+    const userInfo = await oauth2.userinfo.get();
+    const email = userInfo.data.email;
 
-if (result.rowCount === 0) {
-  return res.status(404).send("User not found. Please sign up first.");
-}
+    const result = await pool.query("SELECT * FROM users WHERE email = $1", [
+      email,
+    ]);
 
-const user = result.rows[0];
+    if (result.rowCount === 0) {
+      return res.status(404).send("User not found. Please sign up first.");
+    }
 
-await pool.query("UPDATE users SET google_tokens = $1 WHERE id = $2", [
-  tokens,
-  user.id,
-]);
+    const user = result.rows[0];
 
-const accessToken = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, {
-  expiresIn: "1d",
-});
+    await pool.query("UPDATE users SET google_tokens = $1 WHERE id = $2", [
+      tokens,
+      user.id,
+    ]);
 
-res.redirect(`http://localhost:3000/dashboard?token=${accessToken}`);
+    const accessToken = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, {
+      expiresIn: "1d",
+    });
 
-} catch (error) {
-console.error("❌ Google OAuth Callback Error:", error);
-res.status(500).send("Google authentication failed.");
-}
+    res.redirect(`http://localhost:3000/dashboard?token=${accessToken}`);
+  } catch (error) {
+    console.error("❌ Google OAuth Callback Error:", error);
+    res.status(500).send("Google authentication failed.");
+  }
 });
 
 module.exports = router;
