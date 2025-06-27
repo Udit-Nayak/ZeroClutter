@@ -1,0 +1,15 @@
+# Ignore node_modules in both frontend and backend
+/backend/node_modules/
+/frontend/node_modules/
+
+# Ignore .env files in both folders
+/backend/.env
+/frontend/.env
+
+# Optional: Add common ignores
+*.log
+.DS_Store
+.env
+node_modules/
+dist/
+build/
