@@ -148,16 +148,21 @@ function DriveDashboard() {
           >
             List Files
           </button>
-          <button 
+          <button
             onClick={() => fetchDriveFiles(token, true)}
-            style={{ marginRight: "1rem" }}>
+            style={{ marginRight: "1rem" }}
+          >
             Show Duplicates
           </button>
-          <button
-            onClick={handleEmptyTrash}
-            style={{ marginRight: "1rem"  }}
-          >
+          <button onClick={handleEmptyTrash} style={{ marginRight: "1rem" }}>
             Empty Trash
+          </button>
+
+          <button
+            onClick={() => (window.location.href = `/reports?token=${token}`)}
+            style={{ marginRight: "1rem" }}
+          >
+            Reports
           </button>
         </div>
       )}
