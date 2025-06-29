@@ -125,6 +125,26 @@ function DriveDashboard() {
     }
   };
 
+  const handleRescanDriveFiles = async () => {
+  try {
+    setLoading(true);
+    setError("");
+    await axios.post(
+      "http://localhost:5000/api/driveFiles/rescan",
+      {},
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    alert("Rescan completed and files updated!");
+    fetchDriveFiles(); // Reload updated file list
+  } catch (err) {
+    console.error("Failed to rescan drive:", err);
+    setError("Failed to rescan drive");
+  } finally {
+    setLoading(false);
+  }
+};
+
+
   return (
     <div style={{ padding: "2rem" }}>
       <h2>Your Drive Files</h2>
@@ -153,6 +173,10 @@ function DriveDashboard() {
           >
             Reports
           </button>
+          <button onClick={handleRescanDriveFiles} style={{ marginRight: "1rem" }}>
+  Rescan
+</button>
+
         </div>
       )}
 

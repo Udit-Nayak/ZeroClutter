@@ -2,6 +2,97 @@ const { google } = require("googleapis");
 const { getOAuth2Client } = require("../libs/googleOAuth");
 const pool = require("../db");
 
+
+const rescanDriveFiles = async (req, res) => {
+  try {
+    const user = req.user;
+    if (!user || !user.google_tokens) {
+      return res.status(400).json({ error: "Google Drive not connected" });
+    }
+
+    const auth = getOAuth2Client();
+    auth.setCredentials(user.google_tokens);
+    const drive = google.drive({ version: "v3", auth });
+
+    const files = [];
+    let nextPageToken = null;
+
+    do {
+      const result = await drive.files.list({
+        pageSize: 1000,
+        fields: "nextPageToken, files(id, name, mimeType, size, modifiedTime, parents, md5Checksum)",
+        q: "trashed = false",
+        pageToken: nextPageToken || undefined,
+      });
+
+      files.push(...result.data.files);
+      nextPageToken = result.data.nextPageToken;
+    } while (nextPageToken);
+
+    // 1️⃣ Get existing file_ids from DB
+    const { rows: dbFiles } = await pool.query(
+      "SELECT file_id FROM drive_files WHERE user_id = $1",
+      [user.id]
+    );
+    const dbFileIds = new Set(dbFiles.map((f) => f.file_id));
+    const driveFileIds = new Set(files.map((f) => f.id));
+
+    // 2️⃣ Delete DB files not in Drive
+    const deletedIds = [...dbFileIds].filter((id) => !driveFileIds.has(id));
+    if (deletedIds.length > 0) {
+      await pool.query(
+        `DELETE FROM drive_files WHERE user_id = $1 AND file_id = ANY($2::text[])`,
+        [user.id, deletedIds]
+      );
+    }
+
+    // 3️⃣ Upsert current files
+    for (const file of files) {
+      const existsInDb = dbFileIds.has(file.id);
+      if (existsInDb) {
+        // Update existing record
+        await pool.query(
+          `UPDATE drive_files 
+           SET name = $1, size = $2, mime_type = $3, modified = $4, parent_id = $5, content_hash = $6
+           WHERE user_id = $7 AND file_id = $8`,
+          [
+            file.name,
+            Number(file.size) || 0,
+            file.mimeType,
+            file.modifiedTime,
+            file.parents?.[0] || null,
+            file.md5Checksum || null,
+            user.id,
+            file.id,
+          ]
+        );
+      } else {
+        // Insert new file
+        await pool.query(
+          `INSERT INTO drive_files 
+           (user_id, file_id, name, size, mime_type, modified, parent_id, content_hash)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          [
+            user.id,
+            file.id,
+            file.name,
+            Number(file.size) || 0,
+            file.mimeType,
+            file.modifiedTime,
+            file.parents?.[0] || null,
+            file.md5Checksum || null,
+          ]
+        );
+      }
+    }
+
+    res.json({ message: "Drive re-scanned and database updated." });
+  } catch (err) {
+    console.error("❌ Failed to rescan drive:", err.message);
+    res.status(500).json({ error: "Rescan failed" });
+  }
+};
+
 const scanDriveFiles = async (req, res) => {
   try {
     const user = req.user;
@@ -158,4 +249,5 @@ module.exports = {
   scanDriveFiles,
   listDriveFiles,
   emptyTrash,
+  rescanDriveFiles,
 };
