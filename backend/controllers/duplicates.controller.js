@@ -1,5 +1,4 @@
 const pool = require("../db");
-const crypto = require("crypto");
 const { google } = require("googleapis");
 const { getOAuth2Client } = require("../libs/googleOAuth");
 const { v4: uuidv4 } = require("uuid");
@@ -7,15 +6,18 @@ const { v4: uuidv4 } = require("uuid");
 exports.getDuplicateFiles = async (req, res) => {
   try {
     const user = req.user;
+
     const query = `
       SELECT 
-      MIN(file_id) AS file_id,
-      name,
-      size,
-      COUNT(*) AS duplicate_count
+        MIN(file_id) AS file_id,
+        name,
+        size,
+        content_hash,
+        COUNT(*) AS duplicate_count,
+        array_agg(file_id) AS file_ids
       FROM drive_files
       WHERE user_id = $1
-      GROUP BY name, size
+      GROUP BY name, size, content_hash
       HAVING COUNT(*) > 1;
     `;
 
@@ -30,7 +32,7 @@ exports.getDuplicateFiles = async (req, res) => {
 exports.deleteDuplicates = async (req, res) => {
   try {
     const user = req.user;
-    const { name, size } = req.body;
+    const { name, size, content_hash } = req.body;
 
     if (!name || !size) {
       return res.status(400).json({ error: "Missing name or size" });
@@ -40,15 +42,23 @@ exports.deleteDuplicates = async (req, res) => {
       return res.status(400).json({ error: "Google Drive not connected" });
     }
 
-    const auth = new google.auth.OAuth2();
+    const auth = getOAuth2Client();
     auth.setCredentials(user.google_tokens);
     const drive = google.drive({ version: "v3", auth });
 
     const { rows } = await pool.query(
-      `SELECT * FROM drive_files
-       WHERE user_id = $1 AND name = $2 AND size = $3
-       ORDER BY file_id`,
-      [user.id, name, size]
+      `
+        SELECT * FROM drive_files
+        WHERE user_id = $1
+          AND name = $2
+          AND size = $3
+          AND (
+            (content_hash = $4) OR
+            (content_hash IS NULL AND $4 IS NULL)
+          )
+        ORDER BY file_id;
+      `,
+      [user.id, name, size, content_hash || null]
     );
 
     if (rows.length <= 1) {
@@ -56,12 +66,11 @@ exports.deleteDuplicates = async (req, res) => {
     }
 
     const batchId = uuidv4();
-    const filesToDelete = rows.slice(1); // Keep one copy
+    const filesToDelete = rows.slice(1);
     let deletedCount = 0;
 
     for (const file of filesToDelete) {
       try {
-        // Check file ownership before attempting delete
         const metadata = await drive.files.get({
           fileId: file.file_id,
           fields: "owners",
@@ -72,9 +81,7 @@ exports.deleteDuplicates = async (req, res) => {
         );
 
         if (!isOwner) {
-          console.log(
-            `⚠️ Cannot delete file '${file.name}' (${file.file_id}): User is not the owner.`
-          );
+          console.warn(`⚠️ Not owner of file: ${file.name} (${file.file_id})`);
           continue;
         }
 
@@ -82,8 +89,8 @@ exports.deleteDuplicates = async (req, res) => {
           fileId: file.file_id,
           requestBody: { trashed: true },
         });
-        console.log(`✅ Deleted from Drive: ${file.file_id}`);
-        console.log(`🗑️ Moved to Trash: ${file.file_id}`);
+
+        console.log(`🗑️ Moved to trash: ${file.file_id}`);
         deletedCount++;
 
         await pool.query(
@@ -100,11 +107,8 @@ exports.deleteDuplicates = async (req, res) => {
             batchId,
           ]
         );
-      } catch (error) {
-        console.error(
-          `❌ Failed to process file ${file.file_id}:`,
-          error.message
-        );
+      } catch (err) {
+        console.error(`❌ Failed to delete ${file.file_id}: ${err.message}`);
       }
     }
 
@@ -113,9 +117,7 @@ exports.deleteDuplicates = async (req, res) => {
       deleted: deletedCount,
     });
   } catch (err) {
-    console.error("❌ Failed to delete duplicates:", err);
-    res
-      .status(500)
-      .json({ error: "Internal server error while deleting duplicates" });
+    console.error("❌ Internal error while deleting duplicates:", err);
+    res.status(500).json({ error: "Failed to delete duplicates" });
   }
 };

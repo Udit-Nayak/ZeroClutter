@@ -9,10 +9,9 @@ const formatSize = (bytes) => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + " " + sizes[i];
 };
 
-const FileTree = ({ nodes, showDuplicates,onDeleteDuplicate  }) => {
+const FileTree = ({ nodes, showDuplicates, onDeleteDuplicate }) => {
   if (!nodes || nodes.length === 0) return <p>No files to display.</p>;
 
-  // Show duplicates as table
   if (showDuplicates) {
     return (
       <table style={{ borderCollapse: "collapse", width: "100%" }}>
@@ -25,44 +24,44 @@ const FileTree = ({ nodes, showDuplicates,onDeleteDuplicate  }) => {
           </tr>
         </thead>
         <tbody>
-  {nodes.map((node) => (
-    <tr key={node.file_id}>
-      <td style={styles.cell}>
-        <a
-          href={`https://drive.google.com/file/d/${node.file_id}/view`}
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{ color: "blue", textDecoration: "none" }}
-        >
-          {node.name}
-        </a>
-      </td>
-      <td style={styles.cell}>{formatSize(node.size)}</td>
-      <td style={styles.cell}>{node.duplicate_count}</td>
-      <td style={styles.cell}>
-        <button
-          onClick={() => onDeleteDuplicate(node.name, node.size)}
-          style={{
-            padding: "4px 8px",
-            backgroundColor: "#dc3545",
-            color: "#fff",
-            border: "none",
-            borderRadius: "4px",
-            cursor: "pointer",
-          }}
-        >
-          Delete Duplicates
-        </button>
-      </td>
-    </tr>
-  ))}
-</tbody>
-
+          {nodes.map((node) => (
+            <tr key={node.file_id}>
+              <td style={styles.cell}>
+                <a
+                  href={`https://drive.google.com/file/d/${node.file_id}/view`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: "blue", textDecoration: "none" }}
+                >
+                  {node.name}
+                </a>
+              </td>
+              <td style={styles.cell}>{formatSize(node.size)}</td>
+              <td style={styles.cell}>{node.duplicate_count}</td>
+              <td style={styles.cell}>
+                <button
+                  onClick={() =>
+                    onDeleteDuplicate(node.name, node.size, node.content_hash)
+                  }
+                  style={{
+                    padding: "4px 8px",
+                    backgroundColor: "#dc3545",
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: "4px",
+                    cursor: "pointer",
+                  }}
+                >
+                  Delete Duplicates
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
       </table>
     );
   }
 
-  // Default rendering for non-duplicates
   const renderTree = (node) => {
     const isFolder = node.mime_type === "application/vnd.google-apps.folder";
     return (
@@ -95,12 +94,12 @@ const styles = {
     padding: "8px",
     backgroundColor: "#f2f2f2",
     fontWeight: "bold",
-    textAlign: "left"
+    textAlign: "left",
   },
   cell: {
     border: "1px solid #ddd",
-    padding: "8px"
-  }
+    padding: "8px",
+  },
 };
 
 export default FileTree;

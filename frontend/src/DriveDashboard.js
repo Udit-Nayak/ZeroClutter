@@ -59,9 +59,7 @@ function DriveDashboard() {
       setFiles(fileTree);
     } catch (err) {
       console.error("Failed to fetch files:", err);
-      setError(
-        "Failed to fetch files. Make sure you're logged in and Drive is connected."
-      );
+      setError("Failed to fetch files. Make sure you're logged in and Drive is connected.");
     } finally {
       setLoading(false);
     }
@@ -90,24 +88,17 @@ function DriveDashboard() {
     setFilters({ ...filters, [e.target.name]: e.target.value });
   };
 
-  const handleDeleteDuplicate = async (name, size) => {
+  const handleDeleteDuplicate = async (name, size, content_hash) => {
     try {
       setLoading(true);
-
       await axios.post(
         "http://localhost:5000/api/duplicates/delete",
-        { name, size },
+        { name, size, content_hash }, 
         {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
-
-      // Update the frontend table by filtering out the deleted group
-      setFiles((prevFiles) =>
-        prevFiles.filter(
-          (file) => !(file.name === name && Number(file.size) === Number(size))
-        )
-      );
+      fetchDriveFiles(token, true); 
     } catch (err) {
       console.error("Failed to delete duplicates:", err);
       setError("Failed to delete duplicates");
@@ -120,13 +111,11 @@ function DriveDashboard() {
     try {
       setLoading(true);
       setError("");
-
       await axios.post(
         "http://localhost:5000/api/driveFiles/emptyTrash",
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
-
       alert("Trash emptied successfully!");
     } catch (err) {
       console.error("Failed to empty trash:", err);
@@ -140,6 +129,7 @@ function DriveDashboard() {
     <div style={{ padding: "2rem" }}>
       <h2>Your Drive Files</h2>
       {error && <p style={{ color: "red" }}>{error}</p>}
+
       {isAuthenticated && (
         <div style={{ marginBottom: "1rem" }}>
           <button
@@ -157,7 +147,6 @@ function DriveDashboard() {
           <button onClick={handleEmptyTrash} style={{ marginRight: "1rem" }}>
             Empty Trash
           </button>
-
           <button
             onClick={() => (window.location.href = `/reports?token=${token}`)}
             style={{ marginRight: "1rem" }}
@@ -166,6 +155,7 @@ function DriveDashboard() {
           </button>
         </div>
       )}
+
       {isAuthenticated && files.length > 0 && !isDuplicateMode && (
         <div style={{ marginBottom: "1rem" }}>
           <input
@@ -200,6 +190,7 @@ function DriveDashboard() {
           </button>
         </div>
       )}
+
       {loading ? (
         <p>Loading...</p>
       ) : files.length === 0 && isAuthenticated ? (
