@@ -86,6 +86,12 @@ const rescanDriveFiles = async (req, res) => {
       }
     }
 
+    await pool.query(
+      `INSERT INTO scan_history (user_id, scan_type, scanned_files, scan_report)
+       VALUES ($1, $2, $3, $4)`,
+      [user.id, 'rescan', files.length, null]
+    );
+
     res.json({ message: "Drive re-scanned and database updated." });
   } catch (err) {
     console.error("❌ Failed to rescan drive:", err.message);

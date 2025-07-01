@@ -83,6 +83,12 @@ exports.getDriveReports = async (req, res) => {
 
     const deletedSize = parseInt(deleted[0]?.deleted_size || "0");
 
+    await pool.query(
+      `INSERT INTO reports (user_id, report_type, report)
+       VALUES ($1, $2, $3)`,
+      [user.id, 'pdf', null]
+    );
+
     res.json({
       totalUsage,
       totalQuota,
