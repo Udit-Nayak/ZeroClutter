@@ -10,6 +10,7 @@ const driveFilesRoutes = require("./routes/driveFiles.routes");
 const duplicateRoutes = require("./routes/duplicates.routes");
 const googleAuthRoutes = require("./routes/googleAuth");
 const reportRoutes=require("./routes/reports.routes")
+const MailRoutes=require("./routes/gmailsubscriptions.routes")
 
 const app = express();
 app.use(cors({ origin: "http://localhost:3000", credentials: true }));
@@ -20,6 +21,7 @@ app.use("/api/auth", userRoutes);
 app.use("/api/driveFiles", driveFilesRoutes);
 app.use("/api/duplicates", duplicateRoutes); 
 app.use("/api/reports", reportRoutes); 
+app.use("/api/gmail", MailRoutes); 
 
 
 app.get("/", (req, res) => {

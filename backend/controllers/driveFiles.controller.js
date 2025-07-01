@@ -29,7 +29,6 @@ const rescanDriveFiles = async (req, res) => {
       nextPageToken = result.data.nextPageToken;
     } while (nextPageToken);
 
-    // 1️⃣ Get existing file_ids from DB
     const { rows: dbFiles } = await pool.query(
       "SELECT file_id FROM drive_files WHERE user_id = $1",
       [user.id]
@@ -37,7 +36,6 @@ const rescanDriveFiles = async (req, res) => {
     const dbFileIds = new Set(dbFiles.map((f) => f.file_id));
     const driveFileIds = new Set(files.map((f) => f.id));
 
-    // 2️⃣ Delete DB files not in Drive
     const deletedIds = [...dbFileIds].filter((id) => !driveFileIds.has(id));
     if (deletedIds.length > 0) {
       await pool.query(
@@ -46,11 +44,9 @@ const rescanDriveFiles = async (req, res) => {
       );
     }
 
-    // 3️⃣ Upsert current files
     for (const file of files) {
       const existsInDb = dbFileIds.has(file.id);
       if (existsInDb) {
-        // Update existing record
         await pool.query(
           `UPDATE drive_files 
            SET name = $1, size = $2, mime_type = $3, modified = $4, parent_id = $5, content_hash = $6
@@ -67,7 +63,6 @@ const rescanDriveFiles = async (req, res) => {
           ]
         );
       } else {
-        // Insert new file
         await pool.query(
           `INSERT INTO drive_files 
            (user_id, file_id, name, size, mime_type, modified, parent_id, content_hash)

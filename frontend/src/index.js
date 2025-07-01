@@ -2,7 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import App from "./App";
-import DriveDashboard from "./DriveDashboard";
+import DriveDashboard from "./components/Drive/DriveDashboard";
 import ReportsPage from "./components/ReportsPage";
 
 const params = new URLSearchParams(window.location.search);

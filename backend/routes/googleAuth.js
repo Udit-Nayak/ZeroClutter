@@ -12,9 +12,10 @@ router.get("/login", (req, res) => {
     access_type: "offline",
     prompt: "consent", // <-- FORCE user to approve again
     scope: [
-      "https://www.googleapis.com/auth/drive", // FULL access to delete files
+      "https://www.googleapis.com/auth/drive", 
       "https://www.googleapis.com/auth/userinfo.email",
       "https://www.googleapis.com/auth/userinfo.profile",
+      "https://www.googleapis.com/auth/gmail.readonly", 
       "openid",
     ],
   });
