@@ -1,38 +1,34 @@
+// useGmail.js
 import { useState } from "react";
 import axios from "axios";
 
-const useGmail = (token) => {
-  const [emails, setEmails] = useState([]);
+export default function useGmail(token) {
+  const [mails, setMails] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const fetchEmails = async () => {
+  const fetchMails = async () => {
     try {
       setLoading(true);
-      setError("");
-
-      const response = await axios.get("http://localhost:5000/api/gmail/fetch", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+      const res = await axios.get("http://localhost:5000/api/gmail/fetch", {
+        headers: { Authorization: `Bearer ${token}` },
       });
-
-      setEmails(response.data); // assumes backend returns an array of emails
+      setMails(res.data);
     } catch (err) {
-      setError("Failed to fetch emails.");
+      console.error("Fetch error:", err);
+      setError("Failed to fetch Gmail messages");
     } finally {
       setLoading(false);
     }
   };
 
   return {
-    emails,
+    mails,
     loading,
     error,
-    fetchEmails,
+    fetchMails,
     setError,
     setLoading,
+    setMails, // exposed so GmailDashboard can use it if needed
   };
-};
-
-export default useGmail;
+}

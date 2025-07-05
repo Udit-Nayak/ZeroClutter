@@ -5,7 +5,7 @@ exports.fetchAllMails = async (req, res) => {
   try {
     const user = req.user;
     const auth = getOAuth2Client();
-    auth.setCredentials(req.user.google_tokens);
+    auth.setCredentials(user.google_tokens);
     const gmail = google.gmail({ version: "v1", auth });
 
     let allMessages = [];
@@ -14,17 +14,44 @@ exports.fetchAllMails = async (req, res) => {
     do {
       const response = await gmail.users.messages.list({
         userId: "me",
-        maxResults: 500,
+        maxResults: 50,
         pageToken: nextPageToken || undefined,
       });
 
-      allMessages.push(...(response.data.messages || []));
-
+      const messageIds = response.data.messages || [];
       nextPageToken = response.data.nextPageToken;
-    } while (nextPageToken);
-    res.json(allMessages);
+
+      const detailedMessages = await Promise.all(
+        messageIds.map(async (msg) => {
+          const detail = await gmail.users.messages.get({
+            userId: "me",
+            id: msg.id,
+            format: "metadata",
+            metadataHeaders: ["Subject", "From", "Date"],
+          });
+
+          const headers = detail.data.payload?.headers || [];
+
+          const getHeader = (name) =>
+            headers.find((h) => h.name === name)?.value || "";
+
+          return {
+            id: detail.data.id,
+            subject: getHeader("Subject") || "(No Subject)",
+            from: getHeader("From"),
+            date: getHeader("Date"),
+            snippet: detail.data.snippet,
+          };
+        })
+      );
+
+      allMessages.push(...detailedMessages);
+    } while (nextPageToken && allMessages.length < 100);
+
+    console.log("Fetched messages:", allMessages.length);
+    return res.json(allMessages);
   } catch (err) {
     console.error("Failed to fetch emails:", err.message);
-    res.status(500).json({ error: "Failed to fetch Gmails messages" });
+    return res.status(500).json({ error: "Failed to fetch Gmail messages" });
   }
 };
