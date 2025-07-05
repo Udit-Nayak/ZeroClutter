@@ -1,12 +1,10 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import App from "./App";
-import DriveDashboard from "./components/Drive/DriveDashboard";
-import ReportsPage from "./components/ReportsPage";
+import MainDashboard from "./components/MainDashboard";
+import ReportsPage from "./components/ReportsPage"
 
-const params = new URLSearchParams(window.location.search);
-const token = params.get("token");
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(
@@ -14,14 +12,9 @@ root.render(
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<App />} />
-        <Route
-          path="/dashboard"
-          element={token ? <DriveDashboard /> : <Navigate to="/" />}
-        />
-        <Route
-          path="/reports"
-          element={token ? <ReportsPage /> : <Navigate to="/" />}
-        />
+        <Route path="/dashboard" element={<MainDashboard />} />
+        <Route path="/reports" element={<ReportsPage />} /> 
+
       </Routes>
     </BrowserRouter>
   </React.StrictMode>

@@ -7,8 +7,8 @@ import FilterPanel from "./FilterPanel";
 import DriveLoader from "./DriveLoader";
 import axios from "axios";
 
-function DriveDashboard() {
-  const [token, setToken] = useState("");
+function DriveDashboard({ token: propToken }) {
+  const [token, setToken] = useState(propToken || "");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   const {
@@ -23,16 +23,15 @@ function DriveDashboard() {
     setLoading,
   } = useDrive(token);
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const t = params.get("token");
-    if (t) {
-      setToken(t);
-      setIsAuthenticated(true);
-    } else {
-      setError("No token found in URL.");
-    }
-  }, []);
+useEffect(() => {
+  if (propToken) {
+    setToken(propToken);
+    setIsAuthenticated(true);
+  } else {
+    setError("No token found.");
+  }
+}, [propToken, setError]);
+
 
   const handleDeleteDuplicate = async (name, size, content_hash) => {
     try {
@@ -100,14 +99,20 @@ function DriveDashboard() {
           {files.length > 0 && !isDuplicateMode && (
             <FilterPanel
               filters={filters}
-              onChange={(e) => setFilters({ ...filters, [e.target.name]: e.target.value })}
+              onChange={(e) =>
+                setFilters({ ...filters, [e.target.name]: e.target.value })
+              }
               onApply={() => fetchDriveFiles()}
             />
           )}
         </>
       )}
 
-      <DriveLoader loading={loading} isAuthenticated={isAuthenticated} files={files} />
+      <DriveLoader
+        loading={loading}
+        isAuthenticated={isAuthenticated}
+        files={files}
+      />
 
       {!loading && files.length > 0 && (
         <FileTree

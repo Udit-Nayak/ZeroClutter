@@ -1,8 +1,8 @@
 const express = require("express");
 const router = express.Router();
-const { listEmails } = require("../controllers/gmail.controller");
+const { fetchAllMails } = require("../controllers/gmail.controller");
 const protectRoute = require("../middleware/authMiddleware");
 
-router.get("/listMails", protectRoute, listEmails);
+router.get("/fetch", protectRoute, fetchAllMails);
 
 module.exports = router;
