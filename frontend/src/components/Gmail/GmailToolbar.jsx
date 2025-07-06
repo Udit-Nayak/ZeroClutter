@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 
-function GmailToolbar({ onFetch, onFetchLarge ,onFetchTrash, trashMode, onClearTrashMode}) {
+function GmailToolbar({ onFetch, onFetchLarge ,onFetchTrash, trashMode, onClearTrashMode,onFetchSpam}) {
   const [filter, setFilter] = useState("all");
 
   const handleLargeAttachmentFilter = (e) => {
@@ -23,6 +23,9 @@ function GmailToolbar({ onFetch, onFetchLarge ,onFetchTrash, trashMode, onClearT
       <button onClick={trashMode ? onClearTrashMode : onFetchTrash}>
         {trashMode ? "Back to Inbox" : "Emails in Trash"}
       </button>
+
+      <button onClick={onFetchSpam}>Spam Emails</button>
+
     </div>
   );
 }

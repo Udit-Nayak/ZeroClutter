@@ -8,9 +8,10 @@ function GmailDashboard({ token: propToken }) {
   const [token, setToken] = useState(propToken || "");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [trashMails, setTrashMails] = useState([]);
+  const [spamMails, setSpamMails] = useState([]);
   const [selectedMails, setSelectedMails] = useState([]);
-  const [trashMode, setTrashMode] = useState(false);
-  const [loadingTrash, setLoadingTrash] = useState(false);
+  const [mode, setMode] = useState("normal"); // "normal", "trash", "spam"
+  const [loadingMode, setLoadingMode] = useState(false);
 
   const { mails, setMails, loading, error, fetchMails, setError } = useGmail(token);
 
@@ -25,7 +26,7 @@ function GmailDashboard({ token: propToken }) {
 
   const handleFetchLargeAttachments = async (filter = "all") => {
     try {
-      setTrashMode(false);
+      setMode("normal");
       const res = await axios.get(
         `http://localhost:5000/api/gmail/large?filter=${filter}`,
         {
@@ -42,8 +43,8 @@ function GmailDashboard({ token: propToken }) {
 
   const handleFetchTrashMails = async () => {
     try {
-      setTrashMode(true);
-      setLoadingTrash(true);
+      setMode("trash");
+      setLoadingMode(true);
       const res = await axios.get("http://localhost:5000/api/gmail/trash", {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -54,7 +55,25 @@ function GmailDashboard({ token: propToken }) {
       console.error("Failed to fetch trash emails:", err.message);
       setError("Failed to fetch trash emails");
     } finally {
-      setLoadingTrash(false);
+      setLoadingMode(false);
+    }
+  };
+
+  const handleFetchSpamMails = async () => {
+    try {
+      setMode("spam");
+      setLoadingMode(true);
+      const res = await axios.get("http://localhost:5000/api/gmail/spam", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setSpamMails(res.data);
+      setSelectedMails([]);
+      setError("");
+    } catch (err) {
+      console.error("Failed to fetch spam emails:", err.message);
+      setError("Failed to fetch spam emails");
+    } finally {
+      setLoadingMode(false);
     }
   };
 
@@ -68,17 +87,19 @@ function GmailDashboard({ token: propToken }) {
     if (selectedMails.length === 0) return;
     try {
       await axios.post(
-        "http://localhost:5000/api/gmail/trash/delete",
+        `http://localhost:5000/api/gmail/${mode}/delete`,
         { ids: selectedMails },
         {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
-      setTrashMails((prev) =>
-        prev.filter((mail) => !selectedMails.includes(mail.id))
-      );
+      if (mode === "trash") {
+        setTrashMails((prev) => prev.filter((mail) => !selectedMails.includes(mail.id)));
+      } else if (mode === "spam") {
+        setSpamMails((prev) => prev.filter((mail) => !selectedMails.includes(mail.id)));
+      }
       setSelectedMails([]);
-      alert("Selected emails permanently deleted from trash.");
+      alert(`Selected emails permanently deleted from ${mode}.`);
     } catch (err) {
       console.error("Failed to delete selected:", err.message);
       setError("Failed to delete selected emails");
@@ -86,30 +107,32 @@ function GmailDashboard({ token: propToken }) {
   };
 
   const handleDeleteAll = async () => {
-    const allIds = trashMails.map((mail) => mail.id);
+    const allIds =
+      mode === "trash" ? trashMails.map((m) => m.id) : spamMails.map((m) => m.id);
     if (allIds.length === 0) return;
 
     try {
       await axios.post(
-        "http://localhost:5000/api/gmail/trash/delete",
+        `http://localhost:5000/api/gmail/${mode}/delete`,
         { ids: allIds },
         {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
-      setTrashMails([]);
+      if (mode === "trash") setTrashMails([]);
+      else if (mode === "spam") setSpamMails([]);
       setSelectedMails([]);
-      alert("All trash emails permanently deleted.");
+      alert(`All ${mode} emails permanently deleted.`);
     } catch (err) {
-      console.error("Failed to delete all trash mails:", err.message);
-      setError("Failed to delete all trash mails");
+      console.error(`Failed to delete all ${mode} mails:`, err.message);
+      setError(`Failed to delete all ${mode} mails`);
     }
   };
 
-  const displayedMails = trashMode ? trashMails : mails;
+  const displayedMails =
+    mode === "trash" ? trashMails : mode === "spam" ? spamMails : mails;
 
-  // ✅ NEW: Toggle logic using useMemo
-  const allMailIds = useMemo(() => trashMails.map((mail) => mail.id), [trashMails]);
+  const allMailIds = useMemo(() => displayedMails.map((mail) => mail.id), [displayedMails]);
   const allSelected = useMemo(
     () => allMailIds.length > 0 && allMailIds.every((id) => selectedMails.includes(id)),
     [allMailIds, selectedMails]
@@ -126,11 +149,12 @@ function GmailDashboard({ token: propToken }) {
             onFetch={fetchMails}
             onFetchLarge={handleFetchLargeAttachments}
             onFetchTrash={handleFetchTrashMails}
-            trashMode={trashMode}
-            onClearTrashMode={() => setTrashMode(false)}
+            onFetchSpam={handleFetchSpamMails}
+            mode={mode}
+            onClearMode={() => setMode("normal")}
           />
 
-          {trashMode && (
+          {(mode === "trash" || mode === "spam") && (
             <div style={{ marginBottom: "1rem" }}>
               <button
                 onClick={handleDeleteSelected}
@@ -158,15 +182,11 @@ function GmailDashboard({ token: propToken }) {
         </>
       )}
 
-      {(loading || loadingTrash) && (
-        <GmailLoader
-          loading={true}
-          isAuthenticated={isAuthenticated}
-          mails={[]}
-        />
+      {(loading || loadingMode) && (
+        <GmailLoader loading={true} isAuthenticated={isAuthenticated} mails={[]} />
       )}
 
-      {!loading && !loadingTrash && displayedMails?.length > 0 && (
+      {!loading && !loadingMode && displayedMails.length > 0 && (
         <ul style={{ listStyle: "none", padding: 0 }}>
           {displayedMails.map((mail) => (
             <li
@@ -177,7 +197,7 @@ function GmailDashboard({ token: propToken }) {
                 cursor: "pointer",
               }}
             >
-              {trashMode && (
+              {(mode === "trash" || mode === "spam") && (
                 <input
                   type="checkbox"
                   checked={selectedMails.includes(mail.id)}
@@ -200,9 +220,7 @@ function GmailDashboard({ token: propToken }) {
                       color: "#555",
                     }}
                   >
-                    {mail.date
-                      ? new Date(mail.date).toLocaleString()
-                      : "No date"}
+                    {mail.date ? new Date(mail.date).toLocaleString() : "No date"}
                   </span>
                 </div>
                 <div>
@@ -215,7 +233,7 @@ function GmailDashboard({ token: propToken }) {
         </ul>
       )}
 
-      {!loading && !loadingTrash && displayedMails.length === 0 && (
+      {!loading && !loadingMode && displayedMails.length === 0 && (
         <p>No emails found.</p>
       )}
     </div>
