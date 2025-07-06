@@ -55,3 +55,75 @@ exports.fetchAllMails = async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch Gmail messages" });
   }
 };
+
+
+
+exports.fetchLargeAttachmentMails = async (req, res) => {
+  try {
+    const auth = getOAuth2Client();
+    auth.setCredentials(req.user.google_tokens);
+    const gmail = google.gmail({ version: "v1", auth });
+
+    const filter = req.query.filter || "all";
+    let query = "has:attachment";
+
+    // Translate filter into Gmail query
+    if (filter === ">20") {
+      query += " larger:20971520"; // >20MB in bytes
+    } else if (filter === "10-20") {
+      query += " larger:10485760 smaller:20971520"; // 10MB to 20MB
+    } else if (filter === "<10") {
+      query += " smaller:10485760"; // <10MB
+    } else {
+      // default to >5MB for 'all'
+      query += " larger:5242880";
+    }
+
+    const largeMails = [];
+    let nextPageToken = null;
+
+    do {
+      const listRes = await gmail.users.messages.list({
+        userId: "me",
+        maxResults: 100,
+        pageToken: nextPageToken || undefined,
+        q: query,
+      });
+
+      const messageIds = listRes.data.messages || [];
+      nextPageToken = listRes.data.nextPageToken;
+
+      const detailedMessages = await Promise.all(
+        messageIds.map(async (msg) => {
+          const detail = await gmail.users.messages.get({
+            userId: "me",
+            id: msg.id,
+            format: "metadata",
+            metadataHeaders: ["Subject", "From", "Date"],
+          });
+
+          return {
+            id: detail.data.id,
+            snippet: detail.data.snippet,
+            subject:
+              detail.data.payload?.headers?.find((h) => h.name === "Subject")
+                ?.value || "(No Subject)",
+            from:
+              detail.data.payload?.headers?.find((h) => h.name === "From")
+                ?.value || "Unknown",
+            date:
+              detail.data.payload?.headers?.find((h) => h.name === "Date")
+                ?.value || null,
+          };
+        })
+      );
+
+      largeMails.push(...detailedMessages);
+    } while (nextPageToken && largeMails.length < 100); // Limit for performance
+
+    res.json(largeMails);
+  } catch (err) {
+    console.error("Failed to fetch large attachment mails:", err.message);
+    res.status(500).json({ error: "Failed to fetch large attachment mails" });
+  }
+};
