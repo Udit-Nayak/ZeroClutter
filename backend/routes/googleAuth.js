@@ -16,6 +16,7 @@ router.get("/login", (req, res) => {
       "https://www.googleapis.com/auth/userinfo.email",
       "https://www.googleapis.com/auth/userinfo.profile",
       "https://www.googleapis.com/auth/gmail.readonly", 
+      "https://mail.google.com/",
       "openid",
     ],
   });

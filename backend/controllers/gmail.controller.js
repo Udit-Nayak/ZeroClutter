@@ -127,3 +127,86 @@ exports.fetchLargeAttachmentMails = async (req, res) => {
     res.status(500).json({ error: "Failed to fetch large attachment mails" });
   }
 };
+
+
+// Fetch all emails in trash
+exports.fetchTrashEmails = async (req, res) => {
+  try {
+    const auth = getOAuth2Client();
+    auth.setCredentials(req.user.google_tokens);
+    const gmail = google.gmail({ version: "v1", auth });
+
+    const trashEmails = [];
+    let nextPageToken = null;
+
+    do {
+      const response = await gmail.users.messages.list({
+        userId: "me",
+        labelIds: ["TRASH"],
+        maxResults: 100,
+        pageToken: nextPageToken || undefined,
+      });
+
+      const messageIds = response.data.messages || [];
+      nextPageToken = response.data.nextPageToken;
+
+      const detailedMessages = await Promise.all(
+        messageIds.map(async (msg) => {
+          const detail = await gmail.users.messages.get({
+            userId: "me",
+            id: msg.id,
+            format: "metadata",
+            metadataHeaders: ["Subject", "From", "Date"],
+          });
+
+          return {
+            id: detail.data.id,
+            snippet: detail.data.snippet,
+            subject:
+              detail.data.payload?.headers?.find((h) => h.name === "Subject")
+                ?.value || "(No Subject)",
+            from:
+              detail.data.payload?.headers?.find((h) => h.name === "From")
+                ?.value || "Unknown",
+            date:
+              detail.data.payload?.headers?.find((h) => h.name === "Date")
+                ?.value || null,
+          };
+        })
+      );
+
+      trashEmails.push(...detailedMessages);
+    } while (nextPageToken && trashEmails.length < 100);
+
+    res.json(trashEmails);
+  } catch (err) {
+    console.error("Failed to fetch trash emails:", err.message);
+    res.status(500).json({ error: "Failed to fetch trash emails" });
+  }
+};
+
+// Permanently delete selected emails
+// Permanently delete emails from Trash
+exports.deleteSelectedTrashMails = async (req, res) => {
+  try {
+    const auth = getOAuth2Client();
+    auth.setCredentials(req.user.google_tokens);
+    const gmail = google.gmail({ version: "v1", auth });
+
+    const {ids} = req.body;
+
+    for (const id of ids) {
+      await gmail.users.messages.delete({
+        userId: "me",
+        id,
+      });
+    }
+
+
+    res.status(200).json({ success: true });
+  } catch (err) {
+    console.error("Failed to delete selected trash mails:", err.message);
+    res.status(500).json({ error: "Failed to delete selected trash emails" });
+  }
+};
+
