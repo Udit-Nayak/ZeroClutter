@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import GmailToolbar from "./GmailToolbar";
 import GmailLoader from "./GmailLoader";
 import useGmail from "./useGmail";
@@ -12,14 +12,7 @@ function GmailDashboard({ token: propToken }) {
   const [trashMode, setTrashMode] = useState(false);
   const [loadingTrash, setLoadingTrash] = useState(false);
 
-  const {
-    mails,
-    setMails,
-    loading,
-    error,
-    fetchMails,
-    setError,
-  } = useGmail(token);
+  const { mails, setMails, loading, error, fetchMails, setError } = useGmail(token);
 
   useEffect(() => {
     if (propToken) {
@@ -33,9 +26,12 @@ function GmailDashboard({ token: propToken }) {
   const handleFetchLargeAttachments = async (filter = "all") => {
     try {
       setTrashMode(false);
-      const res = await axios.get(`http://localhost:5000/api/gmail/large?filter=${filter}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await axios.get(
+        `http://localhost:5000/api/gmail/large?filter=${filter}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
       setMails(res.data);
       setError("");
     } catch (err) {
@@ -90,28 +86,34 @@ function GmailDashboard({ token: propToken }) {
   };
 
   const handleDeleteAll = async () => {
-  const allIds = trashMails.map((mail) => mail.id);
-  if (allIds.length === 0) return;
+    const allIds = trashMails.map((mail) => mail.id);
+    if (allIds.length === 0) return;
 
-  try {
-    await axios.post(
-      "http://localhost:5000/api/gmail/trash/delete",
-      { ids: allIds },
-      {
-        headers: { Authorization: `Bearer ${token}` },
-      }
-    );
-    setTrashMails([]);
-    setSelectedMails([]);
-    alert("All trash emails permanently deleted.");
-  } catch (err) {
-    console.error("Failed to delete all trash mails:", err.message);
-    setError("Failed to delete all trash mails");
-  }
-};
-
+    try {
+      await axios.post(
+        "http://localhost:5000/api/gmail/trash/delete",
+        { ids: allIds },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      setTrashMails([]);
+      setSelectedMails([]);
+      alert("All trash emails permanently deleted.");
+    } catch (err) {
+      console.error("Failed to delete all trash mails:", err.message);
+      setError("Failed to delete all trash mails");
+    }
+  };
 
   const displayedMails = trashMode ? trashMails : mails;
+
+  // ✅ NEW: Toggle logic using useMemo
+  const allMailIds = useMemo(() => trashMails.map((mail) => mail.id), [trashMails]);
+  const allSelected = useMemo(
+    () => allMailIds.length > 0 && allMailIds.every((id) => selectedMails.includes(id)),
+    [allMailIds, selectedMails]
+  );
 
   return (
     <div style={{ padding: "2rem" }}>
@@ -129,21 +131,30 @@ function GmailDashboard({ token: propToken }) {
           />
 
           {trashMode && (
-  <div style={{ marginBottom: "1rem" }}>
-    <button onClick={handleDeleteSelected} disabled={selectedMails.length === 0}>
-      Delete Selected
-    </button>
-    <button onClick={() => setSelectedMails(trashMails.map((mail) => mail.id))} style={{ marginLeft: "1rem" }}>
-      Select All
-    </button>
-    <button
-      onClick={handleDeleteAll}
-      style={{ marginLeft: "1rem" }}
-    >
-      Delete All
-    </button>
-  </div>
-)}
+            <div style={{ marginBottom: "1rem" }}>
+              <button
+                onClick={handleDeleteSelected}
+                disabled={selectedMails.length === 0}
+              >
+                Delete Selected
+              </button>
+              <button
+                onClick={() => {
+                  if (allSelected) {
+                    setSelectedMails([]);
+                  } else {
+                    setSelectedMails(allMailIds);
+                  }
+                }}
+                style={{ marginLeft: "1rem" }}
+              >
+                {allSelected ? "Deselect All" : "Select All"}
+              </button>
+              <button onClick={handleDeleteAll} style={{ marginLeft: "1rem" }}>
+                Delete All
+              </button>
+            </div>
+          )}
         </>
       )}
 
