@@ -10,10 +10,12 @@ function GmailDashboard({ token: propToken }) {
   const [trashMails, setTrashMails] = useState([]);
   const [spamMails, setSpamMails] = useState([]);
   const [selectedMails, setSelectedMails] = useState([]);
-  const [mode, setMode] = useState("normal"); // "normal", "trash", "spam"
+  const [mode, setMode] = useState("normal");
   const [loadingMode, setLoadingMode] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
 
-  const { mails, setMails, loading, error, fetchMails, setError } = useGmail(token);
+
+  const { mails, setMails, loading, error, setError } = useGmail(token);
 
   useEffect(() => {
     if (propToken) {
@@ -23,6 +25,47 @@ function GmailDashboard({ token: propToken }) {
       setError("No token found.");
     }
   }, [propToken, setError]);
+
+  const handleFetchWithDateFilter = async () => {
+    try {
+      setMode("normal");
+      setShowFilters(true);
+      setLoadingMode(true);
+      const res = await axios.get(
+        `http://localhost:5000/api/gmail/fetch`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      setMails(res.data);
+      setError("");
+    } catch (err) {
+      console.error("Failed to fetch emails:", err.message);
+      setError("Failed to fetch emails");
+    } finally {
+      setLoadingMode(false);
+    }
+  };
+
+  const handleDateFilterChange = async (filter) => {
+    try {
+      setMode("normal");
+      setLoadingMode(true);
+      const res = await axios.get(
+        `http://localhost:5000/api/gmail/fetch?date=${filter}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      setMails(res.data);
+      setError("");
+    } catch (err) {
+      console.error("Failed to fetch filtered emails:", err.message);
+      setError("Failed to fetch filtered emails");
+    } finally {
+      setLoadingMode(false);
+    }
+  };
 
   const handleFetchLargeAttachments = async (filter = "all") => {
     try {
@@ -146,13 +189,28 @@ function GmailDashboard({ token: propToken }) {
       {isAuthenticated && (
         <>
           <GmailToolbar
-            onFetch={fetchMails}
-            onFetchLarge={handleFetchLargeAttachments}
-            onFetchTrash={handleFetchTrashMails}
-            onFetchSpam={handleFetchSpamMails}
-            mode={mode}
-            onClearMode={() => setMode("normal")}
-          />
+  onFetch={() => {
+    setShowFilters(true);
+    handleFetchWithDateFilter();
+  }}
+  onFetchLarge={handleFetchLargeAttachments}
+  onFetchTrash={() => {
+    setShowFilters(false);
+    handleFetchTrashMails();
+  }}
+  onFetchSpam={() => {
+    setShowFilters(false);
+    handleFetchSpamMails();
+  }}
+  trashMode={mode === "trash"}
+  onClearTrashMode={() => {
+    setMode("normal");
+    setShowFilters(false);
+  }}
+  onDateFilter={handleDateFilterChange}
+  showFilters={showFilters}
+/>
+
 
           {(mode === "trash" || mode === "spam") && (
             <div style={{ marginBottom: "1rem" }}>
@@ -233,15 +291,9 @@ function GmailDashboard({ token: propToken }) {
         </ul>
       )}
 
-      {!loading && !loadingMode && displayedMails.length === 0 && (
-        <p>No emails found.</p>
-      )}
+      {!loading && !loadingMode && displayedMails.length === 0 && <p>No emails found.</p>}
     </div>
   );
 }
 
 export default GmailDashboard;
-
-
-
-

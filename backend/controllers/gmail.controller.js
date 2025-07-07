@@ -1,5 +1,20 @@
 const { google } = require("googleapis");
 const { getOAuth2Client } = require("../libs/googleOAuth");
+function getDateFilterQuery(filter) {
+  const now = new Date();
+  const date = new Date(now);
+
+  if (filter === "1m") date.setMonth(now.getMonth() - 1);
+  else if (filter === "3m") date.setMonth(now.getMonth() - 3);
+  else if (filter === "6m") date.setMonth(now.getMonth() - 6);
+  else if (filter === "1y") date.setFullYear(now.getFullYear() - 1);
+  else if (filter === "2y") date.setFullYear(now.getFullYear() - 2);
+  else if (filter === "3y") date.setFullYear(now.getFullYear() - 3);
+  else return "";
+
+  const after = Math.floor(date.getTime() / 1000);
+  return `after:${after}`;
+}
 
 exports.fetchAllMails = async (req, res) => {
   try {
@@ -7,6 +22,9 @@ exports.fetchAllMails = async (req, res) => {
     const auth = getOAuth2Client();
     auth.setCredentials(user.google_tokens);
     const gmail = google.gmail({ version: "v1", auth });
+
+    const filter = req.query.filter || "all";
+    const dateQuery = getDateFilterQuery(filter);
 
     let allMessages = [];
     let nextPageToken = null;
@@ -16,6 +34,7 @@ exports.fetchAllMails = async (req, res) => {
         userId: "me",
         maxResults: 50,
         pageToken: nextPageToken || undefined,
+        q: dateQuery,
       });
 
       const messageIds = response.data.messages || [];
