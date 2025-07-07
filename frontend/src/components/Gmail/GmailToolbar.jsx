@@ -11,6 +11,7 @@ function GmailToolbar({
   showFilters,
   onFetchDuplicates,
   onFetchPromotions,
+  onFetchSmartSuggestions, // 🔹 new prop
 }) {
   return (
     <div style={{ marginBottom: "1rem" }}>
@@ -22,6 +23,7 @@ function GmailToolbar({
         <button onClick={onFetchSpam}>Spam Emails</button>
         <button onClick={onFetchDuplicates}>Show Duplicates</button>
         <button onClick={onFetchPromotions}>Clean Up Promotions</button>
+        <button onClick={onFetchSmartSuggestions}>Smart Suggestions</button>
       </div>
 
       {showFilters && (

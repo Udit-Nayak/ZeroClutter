@@ -15,6 +15,7 @@ function GmailDashboard({ token: propToken }) {
   const [loadingMode, setLoadingMode] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [duplicateGroups, setDuplicateGroups] = useState([]);
+  const [smartMails, setSmartMails] = useState([]);
 
   const { mails, setMails, loading, error, setError } = useGmail(token);
 
@@ -26,6 +27,31 @@ function GmailDashboard({ token: propToken }) {
       setError("No token found.");
     }
   }, [propToken, setError]);
+
+  const handleFetchSmartSuggestions = async () => {
+    try {
+      setLoadingMode(true);
+      setMode("smart");
+      const res = await axios.get(
+        "http://localhost:5000/api/gmail/smart-suggestions",
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      setSmartMails(res.data);
+      setSelectedMails([]);
+      setError("");
+    } catch (err) {
+      console.error("Failed to fetch smart suggestions:", err.message);
+      setError("Failed to fetch smart suggestions");
+    } finally {
+      setLoadingMode(false);
+    }
+  };
+
+  
+
+  
 
   const handleFetchDuplicates = async () => {
     try {
@@ -85,8 +111,6 @@ function GmailDashboard({ token: propToken }) {
       setLoadingMode(false);
     }
   };
-
-  
 
   const handleFetchWithDateFilter = async () => {
     try {
@@ -188,8 +212,13 @@ function GmailDashboard({ token: propToken }) {
   const handleDeleteSelected = async () => {
     if (selectedMails.length === 0) return;
     try {
+      const deleteUrl =
+        mode === "smart"
+          ? "http://localhost:5000/api/gmail/smart-delete"
+          : `http://localhost:5000/api/gmail/${mode}/delete`;
+
       await axios.post(
-        `http://localhost:5000/api/gmail/${mode}/delete`,
+        deleteUrl,
         { ids: selectedMails },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -223,9 +252,14 @@ function GmailDashboard({ token: propToken }) {
     if (allIds.length === 0) return;
 
     try {
+      const deleteUrl =
+        mode === "smart"
+          ? "http://localhost:5000/api/gmail/smart-delete"
+          : `http://localhost:5000/api/gmail/${mode}/delete`;
+
       await axios.post(
-        `http://localhost:5000/api/gmail/${mode}/delete`,
-        { ids: allIds },
+        deleteUrl,
+        { ids: selectedMails },
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (mode === "trash") setTrashMails([]);
@@ -246,6 +280,8 @@ function GmailDashboard({ token: propToken }) {
       ? spamMails
       : mode === "promotions"
       ? promoMails
+      : mode === "smart"
+      ? smartMails
       : mails;
 
   const allMailIds = useMemo(
@@ -282,6 +318,7 @@ function GmailDashboard({ token: propToken }) {
             }}
             onFetchDuplicates={handleFetchDuplicates}
             onFetchPromotions={handleFetchPromotions}
+            onFetchSmartSuggestions={handleFetchSmartSuggestions}
             trashMode={mode === "trash"}
             onClearTrashMode={() => {
               setMode("normal");
@@ -291,7 +328,17 @@ function GmailDashboard({ token: propToken }) {
             showFilters={showFilters}
           />
 
-          {(mode === "trash" || mode === "spam" || mode === "promotions") && (
+          {mode === "smart" && smartMails.length > 0 && (
+            <p style={{ marginTop: "1rem", fontWeight: "bold" }}>
+              You have {smartMails.length} emails that have not been opened in
+              the last 6 months.
+            </p>
+          )}
+
+          {(mode === "trash" ||
+            mode === "spam" ||
+            mode === "promotions" ||
+            mode === "smart") && (
             <div style={{ marginBottom: "1rem" }}>
               <button
                 onClick={handleDeleteSelected}
@@ -311,6 +358,8 @@ function GmailDashboard({ token: propToken }) {
               <button onClick={handleDeleteAll} style={{ marginLeft: "1rem" }}>
                 Delete All
               </button>
+
+              
             </div>
           )}
         </>
@@ -367,60 +416,62 @@ function GmailDashboard({ token: propToken }) {
         )}
 
       {!loading &&
-  !loadingMode &&
-  mode !== "duplicates" &&
-  displayedMails.length > 0 && (
-    <ul style={{ listStyle: "none", padding: 0 }}>
-      {displayedMails.map((mail) => (
-        <li
-          key={mail.id}
-          style={{
-            padding: "1rem",
-            borderBottom: "1px solid #ccc",
-            cursor: "pointer",
-          }}
-        >
-          {/* Show checkbox for deletable modes */}
-          {(mode === "trash" || mode === "spam" || mode === "promotions") && (
-            <input
-              type="checkbox"
-              checked={selectedMails.includes(mail.id)}
-              onChange={() => handleSelect(mail.id)}
-              style={{ marginRight: "1rem" }}
-            />
-          )}
-
-          {/* Gmail message link */}
-          <a
-            href={`https://mail.google.com/mail/u/0/#inbox/${mail.id}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ textDecoration: "none", color: "inherit" }}
-          >
-            <div>
-              <strong>{mail.from}</strong>
-              <span
+        !loadingMode &&
+        mode !== "duplicates" &&
+        displayedMails.length > 0 && (
+          <ul style={{ listStyle: "none", padding: 0 }}>
+            {displayedMails.map((mail) => (
+              <li
+                key={mail.id}
                 style={{
-                  float: "right",
-                  fontSize: "0.9rem",
-                  color: "#555",
+                  padding: "1rem",
+                  borderBottom: "1px solid #ccc",
+                  cursor: "pointer",
                 }}
               >
-                {mail.date
-                  ? new Date(mail.date).toLocaleString()
-                  : "No date"}
-              </span>
-            </div>
-            <div>
-              <strong>{mail.subject}</strong>
-            </div>
-            <div style={{ color: "#555" }}>{mail.snippet}</div>
-          </a>
-        </li>
-      ))}
-    </ul>
-  )}
+                {/* Show checkbox for deletable modes */}
+                {(mode === "trash" ||
+                  mode === "spam" ||
+                  mode === "promotions" ||
+                  mode === "smart") && (
+                  <input
+                    type="checkbox"
+                    checked={selectedMails.includes(mail.id)}
+                    onChange={() => handleSelect(mail.id)}
+                    style={{ marginRight: "1rem" }}
+                  />
+                )}
 
+                {/* Gmail message link */}
+                <a
+                  href={`https://mail.google.com/mail/u/0/#inbox/${mail.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ textDecoration: "none", color: "inherit" }}
+                >
+                  <div>
+                    <strong>{mail.from}</strong>
+                    <span
+                      style={{
+                        float: "right",
+                        fontSize: "0.9rem",
+                        color: "#555",
+                      }}
+                    >
+                      {mail.date
+                        ? new Date(mail.date).toLocaleString()
+                        : "No date"}
+                    </span>
+                  </div>
+                  <div>
+                    <strong>{mail.subject}</strong>
+                  </div>
+                  <div style={{ color: "#555" }}>{mail.snippet}</div>
+                </a>
+              </li>
+            ))}
+          </ul>
+        )}
 
       {!loading &&
         !loadingMode &&
