@@ -421,3 +421,74 @@ exports.deleteDuplicateEmails = async (req, res) => {
     res.status(500).json({ error: "Failed to delete emails" });
   }
 };
+
+
+exports.getPromotionsEmails = async (req, res) => {
+  try {
+    const auth = getOAuth2Client();
+    auth.setCredentials(req.user.google_tokens);
+
+    const gmail = google.gmail({ version: "v1", auth });
+
+    const promoList = await gmail.users.messages.list({
+      userId: "me",
+      labelIds: ["CATEGORY_PROMOTIONS"],
+      maxResults: 100,
+    });
+
+    const messages = promoList.data.messages || [];
+    const fullMails = await Promise.all(
+      messages.map((msg) =>
+        gmail.users.messages.get({ userId: "me", id: msg.id, format: "full" })
+      )
+    );
+
+    const mails = fullMails.map((detail) => {
+      const headers = detail.data.payload.headers;
+      const getHeader = (name) =>
+        headers.find((h) => h.name === name)?.value || "";
+
+      return {
+        id: detail.data.id,
+        from: getHeader("From"),
+        subject: getHeader("Subject"),
+        snippet: detail.data.snippet,
+        date: parseInt(detail.data.internalDate),
+      };
+    });
+
+    res.json(mails);
+  } catch (err) {
+    console.error("Failed to fetch promotions:", err.message);
+    res.status(500).json({ error: "Failed to fetch promotions" });
+  }
+};
+
+
+exports.deletePromotionsEmails = async (req, res) => {
+  try {
+    const auth = getOAuth2Client();
+    auth.setCredentials(req.user.google_tokens);
+    const gmail = google.gmail({ version: "v1", auth });
+
+    const { ids } = req.body;
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: "No email IDs provided" });
+    }
+
+    await Promise.all(
+      ids.map((id) =>
+        gmail.users.messages.delete({
+          userId: "me",
+          id,
+        })
+      )
+    );
+
+    res.status(200).json({ success: true });
+  } catch (err) {
+    console.error("Failed to delete promotional emails:", err.message);
+    res.status(500).json({ error: "Failed to delete promotional emails" });
+  }
+};

@@ -9,6 +9,7 @@ function GmailDashboard({ token: propToken }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [trashMails, setTrashMails] = useState([]);
   const [spamMails, setSpamMails] = useState([]);
+  const [promoMails, setPromoMails] = useState([]);
   const [selectedMails, setSelectedMails] = useState([]);
   const [mode, setMode] = useState("normal");
   const [loadingMode, setLoadingMode] = useState(false);
@@ -31,9 +32,12 @@ function GmailDashboard({ token: propToken }) {
       setLoadingMode(true);
       setMode("duplicates");
 
-      const res = await axios.get("http://localhost:5000/api/gmail/duplicates", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await axios.get(
+        "http://localhost:5000/api/gmail/duplicates",
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
 
       setDuplicateGroups(res.data);
       setError("");
@@ -54,12 +58,35 @@ function GmailDashboard({ token: propToken }) {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       alert("Duplicate emails deleted successfully.");
-      handleFetchDuplicates(); // Refresh after delete
+      handleFetchDuplicates();
     } catch (err) {
       console.error("Failed to delete duplicates:", err.message);
       setError("Failed to delete duplicate emails.");
     }
   };
+
+  const handleFetchPromotions = async () => {
+    try {
+      setLoadingMode(true);
+      setMode("promotions");
+      const res = await axios.get(
+        "http://localhost:5000/api/gmail/promotions",
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      setPromoMails(res.data);
+      setSelectedMails([]);
+      setError("");
+    } catch (err) {
+      console.error("Failed to fetch promotions:", err.message);
+      setError("Failed to fetch promotional emails");
+    } finally {
+      setLoadingMode(false);
+    }
+  };
+
+  
 
   const handleFetchWithDateFilter = async () => {
     try {
@@ -167,9 +194,16 @@ function GmailDashboard({ token: propToken }) {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (mode === "trash") {
-        setTrashMails((prev) => prev.filter((mail) => !selectedMails.includes(mail.id)));
-      } else if (mode === "spam") {
-        setSpamMails((prev) => prev.filter((mail) => !selectedMails.includes(mail.id)));
+        setTrashMails((prev) =>
+          prev.filter((mail) => !selectedMails.includes(mail.id))
+        );
+      } else if (mode === "spam" || mode === "promotions") {
+        const updateList = (listSetter) =>
+          listSetter((prev) =>
+            prev.filter((mail) => !selectedMails.includes(mail.id))
+          );
+        if (mode === "spam") updateList(setSpamMails);
+        if (mode === "promotions") updateList(setPromoMails);
       }
       setSelectedMails([]);
       alert(`Selected emails permanently deleted from ${mode}.`);
@@ -180,7 +214,12 @@ function GmailDashboard({ token: propToken }) {
   };
 
   const handleDeleteAll = async () => {
-    const allIds = mode === "trash" ? trashMails.map((m) => m.id) : spamMails.map((m) => m.id);
+    const allIds =
+      mode === "trash"
+        ? trashMails.map((m) => m.id)
+        : mode === "spam"
+        ? spamMails.map((m) => m.id)
+        : promoMails.map((m) => m.id);
     if (allIds.length === 0) return;
 
     try {
@@ -191,6 +230,7 @@ function GmailDashboard({ token: propToken }) {
       );
       if (mode === "trash") setTrashMails([]);
       else if (mode === "spam") setSpamMails([]);
+      else if (mode === "promotions") setPromoMails([]);
       setSelectedMails([]);
       alert(`All ${mode} emails permanently deleted.`);
     } catch (err) {
@@ -200,11 +240,22 @@ function GmailDashboard({ token: propToken }) {
   };
 
   const displayedMails =
-    mode === "trash" ? trashMails : mode === "spam" ? spamMails : mails;
+    mode === "trash"
+      ? trashMails
+      : mode === "spam"
+      ? spamMails
+      : mode === "promotions"
+      ? promoMails
+      : mails;
 
-  const allMailIds = useMemo(() => displayedMails.map((mail) => mail.id), [displayedMails]);
+  const allMailIds = useMemo(
+    () => displayedMails.map((mail) => mail.id),
+    [displayedMails]
+  );
   const allSelected = useMemo(
-    () => allMailIds.length > 0 && allMailIds.every((id) => selectedMails.includes(id)),
+    () =>
+      allMailIds.length > 0 &&
+      allMailIds.every((id) => selectedMails.includes(id)),
     [allMailIds, selectedMails]
   );
 
@@ -230,6 +281,7 @@ function GmailDashboard({ token: propToken }) {
               handleFetchSpamMails();
             }}
             onFetchDuplicates={handleFetchDuplicates}
+            onFetchPromotions={handleFetchPromotions}
             trashMode={mode === "trash"}
             onClearTrashMode={() => {
               setMode("normal");
@@ -239,9 +291,12 @@ function GmailDashboard({ token: propToken }) {
             showFilters={showFilters}
           />
 
-          {(mode === "trash" || mode === "spam") && (
+          {(mode === "trash" || mode === "spam" || mode === "promotions") && (
             <div style={{ marginBottom: "1rem" }}>
-              <button onClick={handleDeleteSelected} disabled={selectedMails.length === 0}>
+              <button
+                onClick={handleDeleteSelected}
+                disabled={selectedMails.length === 0}
+              >
                 Delete Selected
               </button>
               <button
@@ -262,88 +317,115 @@ function GmailDashboard({ token: propToken }) {
       )}
 
       {(loading || loadingMode) && (
-        <GmailLoader loading={true} isAuthenticated={isAuthenticated} mails={[]} />
+        <GmailLoader
+          loading={true}
+          isAuthenticated={isAuthenticated}
+          mails={[]}
+        />
       )}
 
-{!loading && !loadingMode && mode === "duplicates" && duplicateGroups.length > 0 && (
-  <table style={{ width: "100%", borderCollapse: "collapse", marginTop: "1rem" }}>
-    <thead>
-      <tr style={{ borderBottom: "1px solid #ccc", textAlign: "left" }}>
-        <th style={{ padding: "0.5rem" }}>Sender</th>
-        <th style={{ padding: "0.5rem" }}>Subject</th>
-        <th style={{ padding: "0.5rem" }}>Snippet</th>
-        <th style={{ padding: "0.5rem" }}>Count</th>
-        <th style={{ padding: "0.5rem" }}>Action</th>
-      </tr>
-    </thead>
-    <tbody>
-      {duplicateGroups.map((group, i) => (
-        <tr key={i} style={{ borderBottom: "1px solid #eee" }}>
-          <td style={{ padding: "0.5rem" }}>{group.from}</td>
-          <td style={{ padding: "0.5rem" }}>{group.subject}</td>
-          <td style={{ padding: "0.5rem", color: "#555" }}>{group.snippet}</td>
-          <td style={{ padding: "0.5rem" }}>{group.count}</td>
-          <td style={{ padding: "0.5rem" }}>
-            <button onClick={() => handleDeleteDuplicates(group.duplicateIds)}>
-              Delete duplicate
-            </button>
-          </td>
-        </tr>
-      ))}
-    </tbody>
-  </table>
-)}
+      {!loading &&
+        !loadingMode &&
+        mode === "duplicates" &&
+        duplicateGroups.length > 0 && (
+          <table
+            style={{
+              width: "100%",
+              borderCollapse: "collapse",
+              marginTop: "1rem",
+            }}
+          >
+            <thead>
+              <tr style={{ borderBottom: "1px solid #ccc", textAlign: "left" }}>
+                <th style={{ padding: "0.5rem" }}>Sender</th>
+                <th style={{ padding: "0.5rem" }}>Subject</th>
+                <th style={{ padding: "0.5rem" }}>Snippet</th>
+                <th style={{ padding: "0.5rem" }}>Count</th>
+                <th style={{ padding: "0.5rem" }}>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {duplicateGroups.map((group, i) => (
+                <tr key={i} style={{ borderBottom: "1px solid #eee" }}>
+                  <td style={{ padding: "0.5rem" }}>{group.from}</td>
+                  <td style={{ padding: "0.5rem" }}>{group.subject}</td>
+                  <td style={{ padding: "0.5rem", color: "#555" }}>
+                    {group.snippet}
+                  </td>
+                  <td style={{ padding: "0.5rem" }}>{group.count}</td>
+                  <td style={{ padding: "0.5rem" }}>
+                    <button
+                      onClick={() => handleDeleteDuplicates(group.duplicateIds)}
+                    >
+                      Delete duplicate
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
 
+      {!loading &&
+  !loadingMode &&
+  mode !== "duplicates" &&
+  displayedMails.length > 0 && (
+    <ul style={{ listStyle: "none", padding: 0 }}>
+      {displayedMails.map((mail) => (
+        <li
+          key={mail.id}
+          style={{
+            padding: "1rem",
+            borderBottom: "1px solid #ccc",
+            cursor: "pointer",
+          }}
+        >
+          {/* Show checkbox for deletable modes */}
+          {(mode === "trash" || mode === "spam" || mode === "promotions") && (
+            <input
+              type="checkbox"
+              checked={selectedMails.includes(mail.id)}
+              onChange={() => handleSelect(mail.id)}
+              style={{ marginRight: "1rem" }}
+            />
+          )}
 
-
-      {!loading && !loadingMode && mode !== "duplicates" && displayedMails.length > 0 && (
-        <ul style={{ listStyle: "none", padding: 0 }}>
-          {displayedMails.map((mail) => (
-            <li
-              key={mail.id}
-              style={{
-                padding: "1rem",
-                borderBottom: "1px solid #ccc",
-                cursor: "pointer",
-              }}
-            >
-              {(mode === "trash" || mode === "spam") && (
-                <input
-                  type="checkbox"
-                  checked={selectedMails.includes(mail.id)}
-                  onChange={() => handleSelect(mail.id)}
-                  style={{ marginRight: "1rem" }}
-                />
-              )}
-              <a
-                href={`https://mail.google.com/mail/u/0/#inbox/${mail.id}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ textDecoration: "none", color: "inherit" }}
+          {/* Gmail message link */}
+          <a
+            href={`https://mail.google.com/mail/u/0/#inbox/${mail.id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ textDecoration: "none", color: "inherit" }}
+          >
+            <div>
+              <strong>{mail.from}</strong>
+              <span
+                style={{
+                  float: "right",
+                  fontSize: "0.9rem",
+                  color: "#555",
+                }}
               >
-                <div>
-                  <strong>{mail.from}</strong>
-                  <span
-                    style={{
-                      float: "right",
-                      fontSize: "0.9rem",
-                      color: "#555",
-                    }}
-                  >
-                    {mail.date ? new Date(mail.date).toLocaleString() : "No date"}
-                  </span>
-                </div>
-                <div><strong>{mail.subject}</strong></div>
-                <div style={{ color: "#555" }}>{mail.snippet}</div>
-              </a>
-            </li>
-          ))}
-        </ul>
-      )}
+                {mail.date
+                  ? new Date(mail.date).toLocaleString()
+                  : "No date"}
+              </span>
+            </div>
+            <div>
+              <strong>{mail.subject}</strong>
+            </div>
+            <div style={{ color: "#555" }}>{mail.snippet}</div>
+          </a>
+        </li>
+      ))}
+    </ul>
+  )}
 
-      {!loading && !loadingMode && mode !== "duplicates" && displayedMails.length === 0 && (
-        <p>No emails found.</p>
-      )}
+
+      {!loading &&
+        !loadingMode &&
+        mode !== "duplicates" &&
+        displayedMails.length === 0 && <p>No emails found.</p>}
     </div>
   );
 }
