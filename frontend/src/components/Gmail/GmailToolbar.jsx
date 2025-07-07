@@ -9,6 +9,7 @@ function GmailToolbar({
   onFetchSpam,
   onDateFilter,
   showFilters,
+  onFetchDuplicates ,
 }) {
   // const [sizeFilter, setSizeFilter] = useState("all");
   // const [dateFilter, setDateFilter] = useState("all");
@@ -29,6 +30,9 @@ function GmailToolbar({
           {trashMode ? "Back to Inbox" : "Emails in Trash"}
         </button>
         <button onClick={onFetchSpam}>Spam Emails</button>
+
+        <button onClick={onFetchDuplicates}>Show Duplicates</button>
+
       </div>
 
       {/* Filters below Fetch Email */}

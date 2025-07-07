@@ -16,6 +16,23 @@ function getDateFilterQuery(filter) {
   return `after:${after}`;
 }
 
+
+// Helper to extract fields from message payload
+const extractDetails = (message) => {
+  const headers = message.payload?.headers || [];
+  const getHeader = (name) =>
+    headers.find((h) => h.name.toLowerCase() === name.toLowerCase())?.value || "";
+
+  return {
+    id: message.id,
+    from: getHeader("From"),
+    subject: getHeader("Subject"),
+    snippet: message.snippet,
+    internalDate: parseInt(message.internalDate),
+  };
+};
+
+
 exports.fetchAllMails = async (req, res) => {
   try {
     const user = req.user;
@@ -304,5 +321,103 @@ exports.deleteSpamEmails = async (req, res) => {
   } catch (err) {
     console.error("Failed to delete selected spam mails:", err.message);
     res.status(500).json({ error: "Failed to delete selected spam emails" });
+  }
+};
+
+exports.getDuplicateEmails = async (req, res) => {
+  try {
+    const auth = getOAuth2Client(); // Reuse your configured OAuth2 client
+    auth.setCredentials(req.user.google_tokens); // Use user's stored tokens
+
+    const gmail = google.gmail({ version: "v1", auth });
+
+    let nextPageToken = null;
+    const allMessages = [];
+
+    // Step 1: Fetch up to 500 message metadata
+    do {
+      const response = await gmail.users.messages.list({
+        userId: "me",
+        maxResults: 100,
+        pageToken: nextPageToken,
+      });
+
+      const messages = response.data.messages || [];
+      allMessages.push(...messages);
+      nextPageToken = response.data.nextPageToken;
+    } while (nextPageToken && allMessages.length < 500);
+
+    if (allMessages.length === 0) {
+      return res.json([]); // No messages found
+    }
+
+    // Step 2: Get full details of each message
+    const detailedMessages = await Promise.all(
+      allMessages.map(async (msg) => {
+        const detail = await gmail.users.messages.get({
+          userId: "me",
+          id: msg.id,
+          format: "full",
+        });
+        return extractDetails(detail.data);
+      })
+    );
+
+    // Step 3: Group by from + subject + snippet
+    const groups = {};
+    for (const msg of detailedMessages) {
+      const key = `${msg.from}||${msg.subject}||${msg.snippet}`;
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(msg);
+    }
+
+    // Step 4: Filter and prepare duplicate info
+    const duplicates = Object.values(groups)
+      .filter((group) => group.length > 1)
+      .map((group) => {
+        const sorted = group.sort((a, b) => b.internalDate - a.internalDate);
+        return {
+          from: sorted[0].from,
+          subject: sorted[0].subject,
+          snippet: sorted[0].snippet,
+          count: sorted.length,
+          latestId: sorted[0].id,
+          duplicateIds: sorted.slice(1).map((m) => m.id), // keep only the latest
+        };
+      });
+
+    res.json(duplicates);
+  } catch (err) {
+    console.error("Error fetching duplicates:", err.message);
+    res.status(500).json({ error: "Failed to detect duplicates" });
+  }
+};
+
+
+exports.deleteDuplicateEmails = async (req, res) => {
+  try {
+    const auth = getOAuth2Client();
+    auth.setCredentials(req.user.google_tokens);
+    const gmail = google.gmail({ version: "v1", auth });
+
+    const { ids } = req.body;
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: "No email IDs provided" });
+    }
+
+    await Promise.all(
+      ids.map((id) =>
+        gmail.users.messages.delete({
+          userId: "me",
+          id,
+        })
+      )
+    );
+
+    res.status(200).json({ success: true });
+  } catch (err) {
+    console.error("Failed to bulk delete emails:", err.message);
+    res.status(500).json({ error: "Failed to delete emails" });
   }
 };

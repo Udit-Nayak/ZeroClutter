@@ -13,7 +13,7 @@ function GmailDashboard({ token: propToken }) {
   const [mode, setMode] = useState("normal");
   const [loadingMode, setLoadingMode] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
-
+  const [duplicateGroups, setDuplicateGroups] = useState([]);
 
   const { mails, setMails, loading, error, setError } = useGmail(token);
 
@@ -26,17 +26,49 @@ function GmailDashboard({ token: propToken }) {
     }
   }, [propToken, setError]);
 
+  const handleFetchDuplicates = async () => {
+    try {
+      setLoadingMode(true);
+      setMode("duplicates");
+
+      const res = await axios.get("http://localhost:5000/api/gmail/duplicates", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      setDuplicateGroups(res.data);
+      setError("");
+    } catch (err) {
+      console.error("Failed to fetch duplicates:", err.message);
+      setError("Failed to fetch duplicate emails");
+    } finally {
+      setLoadingMode(false);
+    }
+  };
+
+  const handleDeleteDuplicates = async (ids) => {
+    if (ids.length === 0) return;
+    try {
+      await axios.post(
+        "http://localhost:5000/api/gmail/delete-duplicate",
+        { ids },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      alert("Duplicate emails deleted successfully.");
+      handleFetchDuplicates(); // Refresh after delete
+    } catch (err) {
+      console.error("Failed to delete duplicates:", err.message);
+      setError("Failed to delete duplicate emails.");
+    }
+  };
+
   const handleFetchWithDateFilter = async () => {
     try {
       setMode("normal");
       setShowFilters(true);
       setLoadingMode(true);
-      const res = await axios.get(
-        `http://localhost:5000/api/gmail/fetch`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      const res = await axios.get("http://localhost:5000/api/gmail/fetch", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       setMails(res.data);
       setError("");
     } catch (err) {
@@ -132,9 +164,7 @@ function GmailDashboard({ token: propToken }) {
       await axios.post(
         `http://localhost:5000/api/gmail/${mode}/delete`,
         { ids: selectedMails },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
       if (mode === "trash") {
         setTrashMails((prev) => prev.filter((mail) => !selectedMails.includes(mail.id)));
@@ -150,17 +180,14 @@ function GmailDashboard({ token: propToken }) {
   };
 
   const handleDeleteAll = async () => {
-    const allIds =
-      mode === "trash" ? trashMails.map((m) => m.id) : spamMails.map((m) => m.id);
+    const allIds = mode === "trash" ? trashMails.map((m) => m.id) : spamMails.map((m) => m.id);
     if (allIds.length === 0) return;
 
     try {
       await axios.post(
         `http://localhost:5000/api/gmail/${mode}/delete`,
         { ids: allIds },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
       if (mode === "trash") setTrashMails([]);
       else if (mode === "spam") setSpamMails([]);
@@ -189,44 +216,38 @@ function GmailDashboard({ token: propToken }) {
       {isAuthenticated && (
         <>
           <GmailToolbar
-  onFetch={() => {
-    setShowFilters(true);
-    handleFetchWithDateFilter();
-  }}
-  onFetchLarge={handleFetchLargeAttachments}
-  onFetchTrash={() => {
-    setShowFilters(false);
-    handleFetchTrashMails();
-  }}
-  onFetchSpam={() => {
-    setShowFilters(false);
-    handleFetchSpamMails();
-  }}
-  trashMode={mode === "trash"}
-  onClearTrashMode={() => {
-    setMode("normal");
-    setShowFilters(false);
-  }}
-  onDateFilter={handleDateFilterChange}
-  showFilters={showFilters}
-/>
-
+            onFetch={() => {
+              setShowFilters(true);
+              handleFetchWithDateFilter();
+            }}
+            onFetchLarge={handleFetchLargeAttachments}
+            onFetchTrash={() => {
+              setShowFilters(false);
+              handleFetchTrashMails();
+            }}
+            onFetchSpam={() => {
+              setShowFilters(false);
+              handleFetchSpamMails();
+            }}
+            onFetchDuplicates={handleFetchDuplicates}
+            trashMode={mode === "trash"}
+            onClearTrashMode={() => {
+              setMode("normal");
+              setShowFilters(false);
+            }}
+            onDateFilter={handleDateFilterChange}
+            showFilters={showFilters}
+          />
 
           {(mode === "trash" || mode === "spam") && (
             <div style={{ marginBottom: "1rem" }}>
-              <button
-                onClick={handleDeleteSelected}
-                disabled={selectedMails.length === 0}
-              >
+              <button onClick={handleDeleteSelected} disabled={selectedMails.length === 0}>
                 Delete Selected
               </button>
               <button
                 onClick={() => {
-                  if (allSelected) {
-                    setSelectedMails([]);
-                  } else {
-                    setSelectedMails(allMailIds);
-                  }
+                  if (allSelected) setSelectedMails([]);
+                  else setSelectedMails(allMailIds);
                 }}
                 style={{ marginLeft: "1rem" }}
               >
@@ -244,7 +265,38 @@ function GmailDashboard({ token: propToken }) {
         <GmailLoader loading={true} isAuthenticated={isAuthenticated} mails={[]} />
       )}
 
-      {!loading && !loadingMode && displayedMails.length > 0 && (
+{!loading && !loadingMode && mode === "duplicates" && duplicateGroups.length > 0 && (
+  <table style={{ width: "100%", borderCollapse: "collapse", marginTop: "1rem" }}>
+    <thead>
+      <tr style={{ borderBottom: "1px solid #ccc", textAlign: "left" }}>
+        <th style={{ padding: "0.5rem" }}>Sender</th>
+        <th style={{ padding: "0.5rem" }}>Subject</th>
+        <th style={{ padding: "0.5rem" }}>Snippet</th>
+        <th style={{ padding: "0.5rem" }}>Count</th>
+        <th style={{ padding: "0.5rem" }}>Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      {duplicateGroups.map((group, i) => (
+        <tr key={i} style={{ borderBottom: "1px solid #eee" }}>
+          <td style={{ padding: "0.5rem" }}>{group.from}</td>
+          <td style={{ padding: "0.5rem" }}>{group.subject}</td>
+          <td style={{ padding: "0.5rem", color: "#555" }}>{group.snippet}</td>
+          <td style={{ padding: "0.5rem" }}>{group.count}</td>
+          <td style={{ padding: "0.5rem" }}>
+            <button onClick={() => handleDeleteDuplicates(group.duplicateIds)}>
+              Delete duplicate
+            </button>
+          </td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+)}
+
+
+
+      {!loading && !loadingMode && mode !== "duplicates" && displayedMails.length > 0 && (
         <ul style={{ listStyle: "none", padding: 0 }}>
           {displayedMails.map((mail) => (
             <li
@@ -281,9 +333,7 @@ function GmailDashboard({ token: propToken }) {
                     {mail.date ? new Date(mail.date).toLocaleString() : "No date"}
                   </span>
                 </div>
-                <div>
-                  <strong>{mail.subject}</strong>
-                </div>
+                <div><strong>{mail.subject}</strong></div>
                 <div style={{ color: "#555" }}>{mail.snippet}</div>
               </a>
             </li>
@@ -291,7 +341,9 @@ function GmailDashboard({ token: propToken }) {
         </ul>
       )}
 
-      {!loading && !loadingMode && displayedMails.length === 0 && <p>No emails found.</p>}
+      {!loading && !loadingMode && mode !== "duplicates" && displayedMails.length === 0 && (
+        <p>No emails found.</p>
+      )}
     </div>
   );
 }
