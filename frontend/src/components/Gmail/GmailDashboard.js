@@ -49,10 +49,6 @@ function GmailDashboard({ token: propToken }) {
     }
   };
 
-  
-
-  
-
   const handleFetchDuplicates = async () => {
     try {
       setLoadingMode(true);
@@ -288,6 +284,7 @@ function GmailDashboard({ token: propToken }) {
     () => displayedMails.map((mail) => mail.id),
     [displayedMails]
   );
+  
   const allSelected = useMemo(
     () =>
       allMailIds.length > 0 &&
@@ -358,8 +355,6 @@ function GmailDashboard({ token: propToken }) {
               <button onClick={handleDeleteAll} style={{ marginLeft: "1rem" }}>
                 Delete All
               </button>
-
-              
             </div>
           )}
         </>

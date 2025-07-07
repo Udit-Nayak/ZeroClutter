@@ -16,8 +16,6 @@ function getDateFilterQuery(filter) {
   return `after:${after}`;
 }
 
-
-// Helper to extract fields from message payload
 const extractDetails = (message) => {
   const headers = message.payload?.headers || [];
   const getHeader = (name) =>
