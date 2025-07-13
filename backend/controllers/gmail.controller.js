@@ -21,7 +21,8 @@ function getDateFilterQuery(filter) {
 const extractDetails = (message) => {
   const headers = message.payload?.headers || [];
   const getHeader = (name) =>
-    headers.find((h) => h.name.toLowerCase() === name.toLowerCase())?.value || "";
+    headers.find((h) => h.name.toLowerCase() === name.toLowerCase())?.value ||
+    "";
 
   return {
     id: message.id,
@@ -222,7 +223,7 @@ exports.deleteSelectedTrashMails = async (req, res) => {
     auth.setCredentials(req.user.google_tokens);
     const gmail = google.gmail({ version: "v1", auth });
 
-    const {ids} = req.body;
+    const { ids } = req.body;
 
     for (const id of ids) {
       await gmail.users.messages.delete({
@@ -230,7 +231,6 @@ exports.deleteSelectedTrashMails = async (req, res) => {
         id,
       });
     }
-
 
     res.status(200).json({ success: true });
   } catch (err) {
@@ -588,17 +588,26 @@ exports.topicClusteringHandler = async (req, res) => {
             const msgData = await gmail.users.messages.get({
               userId: "me",
               id: msg.id,
+              format: "full",
             });
 
             const headers = msgData.data.payload?.headers || [];
-            const subject = headers.find((h) => h.name === "Subject")?.value?.trim() || "";
+            const subject =
+              headers.find((h) => h.name === "Subject")?.value?.trim() || "";
             const snippet = msgData.data.snippet?.trim() || "";
+
+            const from =
+              headers.find((h) => h.name === "From")?.value?.trim() ||
+              "Unknown";
+            const date = parseInt(msgData.data.internalDate);
 
             if (subject && snippet) {
               return {
-                email_id: msg.id,
+                id: msg.id,
                 subject,
                 snippet,
+                from,
+                date,
               };
             }
           } catch (err) {
@@ -614,19 +623,32 @@ exports.topicClusteringHandler = async (req, res) => {
     }
 
     if (validEmails.length < 2) {
-      console.warn(`❌ Only ${validEmails.length} valid emails found out of ${totalFetched} scanned`);
-      return res.status(400).json({ error: "Not enough valid emails to cluster." });
+      console.warn(
+        `❌ Only ${validEmails.length} valid emails found out of ${totalFetched} scanned`
+      );
+      return res
+        .status(400)
+        .json({ error: "Not enough valid emails to cluster." });
     }
 
-    console.log(`✅ Sending ${validEmails.length} valid emails to cluster (out of ${totalFetched})`);
+    console.log(
+      `✅ Sending ${validEmails.length} valid emails to cluster (out of ${totalFetched})`
+    );
 
     console.log("🧪 Valid emails ready to cluster:", validEmails.length);
-
 
     const clusterRes = await axios.post(
       "http://localhost:5001/cluster-topics",
       validEmails
     );
+
+    if (!Array.isArray(clusterRes.data)) {
+      console.error("❌ Cluster response is not an array:", clusterRes.data);
+      return res
+        .status(500)
+        .send("Invalid clustering response from microservice.");
+    }
+
 
     res.json(clusterRes.data);
   } catch (err) {

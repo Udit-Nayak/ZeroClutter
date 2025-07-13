@@ -33,14 +33,18 @@ def cluster_topics():
     for item in data:
         subject = item.get("subject", "").strip()
         snippet = item.get("snippet", "").strip()
-        email_id = item.get("email_id", "").strip()
+        email_id = item.get("id", "").strip() or item.get("email_id", "").strip()
+        from_ = item.get("from", "Unknown")
+        date = item.get("date", None)
 
         if subject and snippet:
             valid_emails.append({
                 "text": f"{subject} {snippet}",
-                "email_id": email_id,
+                "id": email_id,
                 "subject": subject,
-                "snippet": snippet
+                "snippet": snippet,
+                "from": from_,
+                "date": date
             })
 
     if len(valid_emails) < 2:
@@ -49,11 +53,11 @@ def cluster_topics():
     print(f"✅ Valid emails to cluster: {len(valid_emails)}")
 
     email_texts = [clean_text(e["text"]) for e in valid_emails]
-    email_ids = [e["email_id"] for e in valid_emails]
+    email_ids = [e["id"] for e in valid_emails]
     subjects = [e["subject"] for e in valid_emails]
     snippets = [e["snippet"] for e in valid_emails]
 
-    # ✅ Reinitialize topic model inside the route (optional but safe)
+    # Reinitialize topic model
     vectorizer_model = CountVectorizer(stop_words="english", min_df=2)
     topic_model = BERTopic(vectorizer_model=vectorizer_model)
 
@@ -67,13 +71,19 @@ def cluster_topics():
         except:
             topic_name = f"Topic {topic_num}"
 
+        # Filter out generic topic names
         if topic_name.lower() in ["this", "your", "me", "to", "a", "you", "it", "the"]:
             continue
+
+        # Get full metadata from valid_emails
+        meta = next((e for e in valid_emails if e["id"] == eid), {})
 
         email_obj = {
             "id": eid,
             "subject": subject,
-            "snippet": snippet
+            "snippet": snippet,
+            "from": meta.get("from", "Unknown"),
+            "date": meta.get("date")
         }
 
         topic_map.setdefault(topic_name, []).append(email_obj)
