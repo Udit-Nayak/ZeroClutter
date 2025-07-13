@@ -635,8 +635,6 @@ exports.topicClusteringHandler = async (req, res) => {
       `✅ Sending ${validEmails.length} valid emails to cluster (out of ${totalFetched})`
     );
 
-    console.log("🧪 Valid emails ready to cluster:", validEmails.length);
-
     const clusterRes = await axios.post(
       "http://localhost:5001/cluster-topics",
       validEmails
@@ -648,7 +646,6 @@ exports.topicClusteringHandler = async (req, res) => {
         .status(500)
         .send("Invalid clustering response from microservice.");
     }
-
 
     res.json(clusterRes.data);
   } catch (err) {
