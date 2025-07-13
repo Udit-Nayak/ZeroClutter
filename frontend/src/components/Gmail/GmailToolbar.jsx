@@ -11,11 +11,19 @@ function GmailToolbar({
   showFilters,
   onFetchDuplicates,
   onFetchPromotions,
-  onFetchSmartSuggestions, // 🔹 new prop
+  onFetchSmartSuggestions,
+  onFetchAIScan,
 }) {
   return (
     <div style={{ marginBottom: "1rem" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: "1rem", flexWrap: "wrap" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "1rem",
+          flexWrap: "wrap",
+        }}
+      >
         <button onClick={onFetch}>Fetch Emails</button>
         <button onClick={trashMode ? onClearTrashMode : onFetchTrash}>
           {trashMode ? "Back to Inbox" : "Emails in Trash"}
@@ -24,10 +32,18 @@ function GmailToolbar({
         <button onClick={onFetchDuplicates}>Show Duplicates</button>
         <button onClick={onFetchPromotions}>Clean Up Promotions</button>
         <button onClick={onFetchSmartSuggestions}>Smart Suggestions</button>
+        <button onClick={onFetchAIScan}>AI Scan</button>{" "}
       </div>
 
       {showFilters && (
-        <div style={{ marginTop: "0.8rem", display: "flex", gap: "1rem", flexWrap: "wrap" }}>
+        <div
+          style={{
+            marginTop: "0.8rem",
+            display: "flex",
+            gap: "1rem",
+            flexWrap: "wrap",
+          }}
+        >
           <select onChange={(e) => onDateFilter(e.target.value)}>
             <option value="all">All Dates</option>
             <option value="1m">Last 1 Month</option>

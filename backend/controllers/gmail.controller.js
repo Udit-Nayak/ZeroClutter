@@ -1,5 +1,7 @@
 const { google } = require("googleapis");
 const { getOAuth2Client } = require("../libs/googleOAuth");
+const axios = require("axios");
+
 function getDateFilterQuery(filter) {
   const now = new Date();
   const date = new Date(now);
@@ -29,7 +31,6 @@ const extractDetails = (message) => {
     internalDate: parseInt(message.internalDate),
   };
 };
-
 
 exports.fetchAllMails = async (req, res) => {
   try {
@@ -293,7 +294,6 @@ exports.getSpamEmails = async (req, res) => {
   }
 };
 
-
 exports.deleteSpamEmails = async (req, res) => {
   try {
     const auth = getOAuth2Client();
@@ -391,7 +391,6 @@ exports.getDuplicateEmails = async (req, res) => {
   }
 };
 
-
 exports.deleteDuplicateEmails = async (req, res) => {
   try {
     const auth = getOAuth2Client();
@@ -419,7 +418,6 @@ exports.deleteDuplicateEmails = async (req, res) => {
     res.status(500).json({ error: "Failed to delete emails" });
   }
 };
-
 
 exports.getPromotionsEmails = async (req, res) => {
   try {
@@ -462,7 +460,6 @@ exports.getPromotionsEmails = async (req, res) => {
   }
 };
 
-
 exports.deletePromotionsEmails = async (req, res) => {
   try {
     const auth = getOAuth2Client();
@@ -490,7 +487,6 @@ exports.deletePromotionsEmails = async (req, res) => {
     res.status(500).json({ error: "Failed to delete promotional emails" });
   }
 };
-
 
 exports.getSmartSuggestions = async (req, res) => {
   try {
@@ -537,7 +533,6 @@ exports.getSmartSuggestions = async (req, res) => {
   }
 };
 
-
 exports.deleteSmartEmails = async (req, res) => {
   try {
     const { ids } = req.body;
@@ -562,5 +557,80 @@ exports.deleteSmartEmails = async (req, res) => {
   } catch (err) {
     console.error("Failed to delete smart suggestion emails:", err.message);
     res.status(500).json({ error: "Failed to delete smart emails" });
+  }
+};
+
+exports.topicClusteringHandler = async (req, res) => {
+  try {
+    const auth = getOAuth2Client();
+    auth.setCredentials(req.user.google_tokens);
+    const gmail = google.gmail({ version: "v1", auth });
+
+    let validEmails = [];
+    let nextPageToken = null;
+    let totalFetched = 0;
+    const MAX_TOTAL = 500;
+
+    while (validEmails.length < 25 && totalFetched < MAX_TOTAL) {
+      const listRes = await gmail.users.messages.list({
+        userId: "me",
+        maxResults: 100,
+        pageToken: nextPageToken || undefined,
+      });
+
+      const messages = listRes.data.messages || [];
+      nextPageToken = listRes.data.nextPageToken;
+      totalFetched += messages.length;
+
+      const batchEmails = await Promise.all(
+        messages.map(async (msg) => {
+          try {
+            const msgData = await gmail.users.messages.get({
+              userId: "me",
+              id: msg.id,
+            });
+
+            const headers = msgData.data.payload?.headers || [];
+            const subject = headers.find((h) => h.name === "Subject")?.value?.trim() || "";
+            const snippet = msgData.data.snippet?.trim() || "";
+
+            if (subject && snippet) {
+              return {
+                email_id: msg.id,
+                subject,
+                snippet,
+              };
+            }
+          } catch (err) {
+            console.warn(`⚠️ Failed to fetch message ${msg.id}:`, err.message);
+          }
+          return null;
+        })
+      );
+
+      validEmails.push(...batchEmails.filter(Boolean));
+
+      if (!nextPageToken) break;
+    }
+
+    if (validEmails.length < 2) {
+      console.warn(`❌ Only ${validEmails.length} valid emails found out of ${totalFetched} scanned`);
+      return res.status(400).json({ error: "Not enough valid emails to cluster." });
+    }
+
+    console.log(`✅ Sending ${validEmails.length} valid emails to cluster (out of ${totalFetched})`);
+
+    console.log("🧪 Valid emails ready to cluster:", validEmails.length);
+
+
+    const clusterRes = await axios.post(
+      "http://localhost:5001/cluster-topics",
+      validEmails
+    );
+
+    res.json(clusterRes.data);
+  } catch (err) {
+    console.error("🔥 Error in topic clustering:", err.message);
+    res.status(500).send("Failed to cluster emails");
   }
 };

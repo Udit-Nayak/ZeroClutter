@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import GmailToolbar from "./GmailToolbar";
 import GmailLoader from "./GmailLoader";
 import useGmail from "./useGmail";
@@ -16,8 +16,11 @@ function GmailDashboard({ token: propToken }) {
   const [showFilters, setShowFilters] = useState(false);
   const [duplicateGroups, setDuplicateGroups] = useState([]);
   const [smartMails, setSmartMails] = useState([]);
-
+  const [topicClusters, setTopicClusters] = useState([]);
+  const [selectedTopic, setSelectedTopic] = useState(null);
+  const [topicEmails, setTopicEmails] = useState([]);
   const { mails, setMails, loading, error, setError } = useGmail(token);
+  const isFetchingClusterRef = useRef(false);
 
   useEffect(() => {
     if (propToken) {
@@ -27,6 +30,49 @@ function GmailDashboard({ token: propToken }) {
       setError("No token found.");
     }
   }, [propToken, setError]);
+
+  const handleFetchTopicClusters = async () => {
+    if (isFetchingClusterRef.current) {
+      console.warn("🔒 Already fetching cluster data. Skipping re-call.");
+      return;
+    }
+    isFetchingClusterRef.current = true;
+
+    try {
+      setLoadingMode(true);
+      setMode("topics");
+
+      const res = await axios.get(
+        "http://localhost:5000/api/topics/emails/for-topic-clustering",
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      const emailData = res.data;
+
+      if (!Array.isArray(emailData) || emailData.length === 0) {
+        console.warn("⚠️ Email data is empty or invalid");
+        return;
+      }
+
+      setTopicClusters(res.data);
+      setSelectedTopic(null);
+      setTopicEmails([]);
+      setError("");
+    } catch (err) {
+      console.error("❌ Failed to fetch topic clusters:", err.message);
+      setError("Failed to fetch topic clusters");
+    } finally {
+      setLoadingMode(false);
+      isFetchingClusterRef.current = false; // 🔓 unlock
+    }
+  };
+
+  const handleTopicClick = async (cluster) => {
+    setSelectedTopic(cluster.topic);
+    setTopicEmails(cluster.emails);
+  };
 
   const handleFetchSmartSuggestions = async () => {
     try {
@@ -284,7 +330,7 @@ function GmailDashboard({ token: propToken }) {
     () => displayedMails.map((mail) => mail.id),
     [displayedMails]
   );
-  
+
   const allSelected = useMemo(
     () =>
       allMailIds.length > 0 &&
@@ -323,6 +369,7 @@ function GmailDashboard({ token: propToken }) {
             }}
             onDateFilter={handleDateFilterChange}
             showFilters={showFilters}
+            onFetchAIScan={handleFetchTopicClusters}
           />
 
           {mode === "smart" && smartMails.length > 0 && (
@@ -330,6 +377,65 @@ function GmailDashboard({ token: propToken }) {
               You have {smartMails.length} emails that have not been opened in
               the last 6 months.
             </p>
+          )}
+
+          {mode === "topics" &&
+            Array.isArray(topicClusters) &&
+            topicClusters.length > 0 && (
+              <div style={{ marginTop: "1rem" }}>
+                <h3>🧠 AI-Detected Topics</h3>
+                {topicClusters.map((cluster, i) => (
+                  <p
+                    key={i}
+                    style={{ cursor: "pointer", fontWeight: "bold" }}
+                    onClick={() => handleTopicClick(cluster)}
+                  >
+                    {cluster.topic} (
+                    {cluster.email_ids?.length || cluster.emails?.length || 0}{" "}
+                    emails)
+                  </p>
+                ))}
+              </div>
+            )}
+
+          {mode === "topics" && selectedTopic && topicEmails.length > 0 && (
+            <div style={{ marginTop: "1rem" }}>
+              <h4>Emails under "{selectedTopic}"</h4>
+              <ul style={{ listStyle: "none", padding: 0 }}>
+                {topicEmails.map((email) => (
+                  <li
+                    key={email.id}
+                    style={{ padding: "1rem", borderBottom: "1px solid #ccc" }}
+                  >
+                    <a
+                      href={`https://mail.google.com/mail/u/0/#inbox/${email.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ textDecoration: "none", color: "inherit" }}
+                    >
+                      <div>
+                        <strong>{email.from || "Unknown sender"}</strong>
+                        <span
+                          style={{
+                            float: "right",
+                            fontSize: "0.9rem",
+                            color: "#555",
+                          }}
+                        >
+                          {email.date
+                            ? new Date(email.date).toLocaleString()
+                            : "No date"}
+                        </span>
+                      </div>
+                      <div>
+                        <strong>{email.subject}</strong>
+                      </div>
+                      <div style={{ color: "#555" }}>{email.snippet}</div>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
 
           {(mode === "trash" ||
