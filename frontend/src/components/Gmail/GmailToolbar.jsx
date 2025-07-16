@@ -11,7 +11,6 @@ function GmailToolbar({
   showFilters,
   onFetchDuplicates,
   onFetchPromotions,
-  onFetchSmartSuggestions,
   onFetchAIScan,
 }) {
   return (
@@ -31,7 +30,6 @@ function GmailToolbar({
         <button onClick={onFetchSpam}>Spam Emails</button>
         <button onClick={onFetchDuplicates}>Show Duplicates</button>
         <button onClick={onFetchPromotions}>Clean Up Promotions</button>
-        <button onClick={onFetchSmartSuggestions}>Smart Suggestions</button>
         <button onClick={onFetchAIScan}>AI Scan</button>{" "}
       </div>
 

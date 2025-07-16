@@ -15,7 +15,6 @@ function GmailDashboard({ token: propToken }) {
   const [loadingMode, setLoadingMode] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [duplicateGroups, setDuplicateGroups] = useState([]);
-  const [smartMails, setSmartMails] = useState([]);
   const [topicClusters, setTopicClusters] = useState([]);
   const [selectedTopic, setSelectedTopic] = useState(null);
   const [topicEmails, setTopicEmails] = useState([]);
@@ -72,27 +71,6 @@ function GmailDashboard({ token: propToken }) {
   const handleTopicClick = async (cluster) => {
     setSelectedTopic(cluster.topic);
     setTopicEmails(cluster.emails);
-  };
-
-  const handleFetchSmartSuggestions = async () => {
-    try {
-      setLoadingMode(true);
-      setMode("smart");
-      const res = await axios.get(
-        "http://localhost:5000/api/gmail/smart-suggestions",
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-      setSmartMails(res.data);
-      setSelectedMails([]);
-      setError("");
-    } catch (err) {
-      console.error("Failed to fetch smart suggestions:", err.message);
-      setError("Failed to fetch smart suggestions");
-    } finally {
-      setLoadingMode(false);
-    }
   };
 
   const handleFetchDuplicates = async () => {
@@ -322,8 +300,6 @@ function GmailDashboard({ token: propToken }) {
       ? spamMails
       : mode === "promotions"
       ? promoMails
-      : mode === "smart"
-      ? smartMails
       : mails;
 
   const allMailIds = useMemo(
@@ -361,7 +337,6 @@ function GmailDashboard({ token: propToken }) {
             }}
             onFetchDuplicates={handleFetchDuplicates}
             onFetchPromotions={handleFetchPromotions}
-            onFetchSmartSuggestions={handleFetchSmartSuggestions}
             trashMode={mode === "trash"}
             onClearTrashMode={() => {
               setMode("normal");
@@ -372,12 +347,6 @@ function GmailDashboard({ token: propToken }) {
             onFetchAIScan={handleFetchTopicClusters}
           />
 
-          {mode === "smart" && smartMails.length > 0 && (
-            <p style={{ marginTop: "1rem", fontWeight: "bold" }}>
-              You have {smartMails.length} emails that have not been opened in
-              the last 6 months.
-            </p>
-          )}
 
           {mode === "topics" &&
             Array.isArray(topicClusters) &&
@@ -440,8 +409,7 @@ function GmailDashboard({ token: propToken }) {
 
           {(mode === "trash" ||
             mode === "spam" ||
-            mode === "promotions" ||
-            mode === "smart") && (
+            mode === "promotions" ) && (
             <div style={{ marginBottom: "1rem" }}>
               <button
                 onClick={handleDeleteSelected}
@@ -533,8 +501,7 @@ function GmailDashboard({ token: propToken }) {
                 {/* Show checkbox for deletable modes */}
                 {(mode === "trash" ||
                   mode === "spam" ||
-                  mode === "promotions" ||
-                  mode === "smart") && (
+                  mode === "promotions") && (
                   <input
                     type="checkbox"
                     checked={selectedMails.includes(mail.id)}

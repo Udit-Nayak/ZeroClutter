@@ -30,8 +30,4 @@ router.post("/delete-duplicate", protectRoute, deleteDuplicateEmails);
 router.get("/promotions", protectRoute, getPromotionsEmails);
 router.post("/promotions/delete", protectRoute, deletePromotionsEmails);
 
-router.get("/smart-suggestions", protectRoute, getSmartSuggestions);
-router.post("/smart-delete", protectRoute, deleteSmartEmails);
-
-
 module.exports = router;
