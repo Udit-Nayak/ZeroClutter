@@ -488,7 +488,6 @@ exports.deletePromotionsEmails = async (req, res) => {
   }
 };
 
-
 exports.topicClusteringHandler = async (req, res) => {
   try {
     const auth = getOAuth2Client();
@@ -580,5 +579,95 @@ exports.topicClusteringHandler = async (req, res) => {
   } catch (err) {
     console.error("🔥 Error in topic clustering:", err.message);
     res.status(500).send("Failed to cluster emails");
+  }
+};
+
+exports.getOldUnreadEmails = async (req, res) => {
+  try {
+    const auth = getOAuth2Client();
+    auth.setCredentials(req.user.google_tokens);
+    const gmail = google.gmail({ version: "v1", auth });
+
+    // 6 months ago timestamp
+    const now = new Date();
+    const sixMonthsAgo = new Date(now.setMonth(now.getMonth() - 6));
+    const after = Math.floor(sixMonthsAgo.getTime() / 1000);
+
+    // Gmail query: unread and older than 6 months
+    const query = `is:unread before:${after}`;
+
+    let oldUnreadEmails = [];
+    let nextPageToken = null;
+
+    do {
+      const response = await gmail.users.messages.list({
+        userId: "me",
+        maxResults: 50,
+        pageToken: nextPageToken || undefined,
+        q: query,
+      });
+
+      const messageIds = response.data.messages || [];
+      nextPageToken = response.data.nextPageToken;
+
+      const detailedMessages = await Promise.all(
+        messageIds.map(async (msg) => {
+          const detail = await gmail.users.messages.get({
+            userId: "me",
+            id: msg.id,
+            format: "metadata",
+            metadataHeaders: ["Subject", "From", "Date"],
+          });
+
+          return {
+            id: detail.data.id,
+            subject:
+              detail.data.payload?.headers?.find((h) => h.name === "Subject")
+                ?.value || "(No Subject)",
+            from:
+              detail.data.payload?.headers?.find((h) => h.name === "From")
+                ?.value || "Unknown",
+            date:
+              detail.data.payload?.headers?.find((h) => h.name === "Date")
+                ?.value || null,
+            snippet: detail.data.snippet,
+          };
+        })
+      );
+
+      oldUnreadEmails.push(...detailedMessages);
+    } while (nextPageToken && oldUnreadEmails.length < 100);
+
+    res.json(oldUnreadEmails);
+  } catch (err) {
+    console.error("Failed to fetch old unread emails:", err.message);
+    res.status(500).json({ error: "Failed to fetch old unread emails" });
+  }
+};
+
+exports.deleteOldUnreadEmails = async (req, res) => {
+  try {
+    const auth = getOAuth2Client();
+    auth.setCredentials(req.user.google_tokens);
+    const gmail = google.gmail({ version: "v1", auth });
+
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: "No email IDs provided" });
+    }
+
+    await Promise.all(
+      ids.map((id) =>
+        gmail.users.messages.delete({
+          userId: "me",
+          id,
+        })
+      )
+    );
+
+    res.status(200).json({ success: true });
+  } catch (err) {
+    console.error("Failed to delete old unread emails:", err.message);
+    res.status(500).json({ error: "Failed to delete old unread emails" });
   }
 };
