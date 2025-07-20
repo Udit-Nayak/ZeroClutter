@@ -119,6 +119,7 @@ useEffect(() => {
           nodes={files}
           showDuplicates={isDuplicateMode}
           onDeleteDuplicate={handleDeleteDuplicate}
+          source="drive"
         />
       )}
     </div>

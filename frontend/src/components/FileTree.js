@@ -9,8 +9,14 @@ const formatSize = (bytes) => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + " " + sizes[i];
 };
 
-const FileTree = ({ nodes, showDuplicates, onDeleteDuplicate }) => {
+const FileTree = ({
+  nodes,
+  showDuplicates,
+  onDeleteDuplicate,
+  source = "drive",
+}) => {
   if (!nodes || nodes.length === 0) return <p>No files to display.</p>;
+  const isLocal = source === "local";
 
   if (showDuplicates) {
     return (
@@ -25,23 +31,32 @@ const FileTree = ({ nodes, showDuplicates, onDeleteDuplicate }) => {
         </thead>
         <tbody>
           {nodes.map((node) => (
-            <tr key={node.file_id}>
+            <tr key={node.file_id || node.local_id || node.name}>
               <td style={styles.cell}>
-                <a
-                  href={`https://drive.google.com/file/d/${node.file_id}/view`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ color: "blue", textDecoration: "none" }}
-                >
-                  {node.name}
-                </a>
+                {isLocal ? (
+                  <span style={{ color: "black" }}>{node.name}</span>
+                ) : (
+                  <a
+                    href={`https://drive.google.com/file/d/${node.file_id}/view`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: "blue", textDecoration: "none" }}
+                  >
+                    {node.name}
+                  </a>
+                )}
               </td>
               <td style={styles.cell}>{formatSize(node.size)}</td>
               <td style={styles.cell}>{node.duplicate_count}</td>
               <td style={styles.cell}>
                 <button
                   onClick={() =>
-                    onDeleteDuplicate(node.name, node.size, node.content_hash)
+                    onDeleteDuplicate(
+                      node.name,
+                      node.size,
+                      node.content_hash,
+                      isLocal ? "local" : "drive"
+                    )
                   }
                   style={{
                     padding: "4px 8px",
@@ -52,7 +67,7 @@ const FileTree = ({ nodes, showDuplicates, onDeleteDuplicate }) => {
                     cursor: "pointer",
                   }}
                 >
-                  Delete Duplicates
+                  {isLocal ? "Suggest Deletion" : "Delete Duplicates"}
                 </button>
               </td>
             </tr>
@@ -64,10 +79,13 @@ const FileTree = ({ nodes, showDuplicates, onDeleteDuplicate }) => {
 
   const renderTree = (node) => {
     const isFolder = node.mime_type === "application/vnd.google-apps.folder";
+
     return (
-      <li key={node.file_id}>
+      <li key={node.file_id || node.local_id || node.name}>
         {isFolder ? (
           <strong>{node.name}</strong>
+        ) : isLocal ? (
+          <span style={{ color: "black" }}>{node.name}</span>
         ) : (
           <a
             href={`https://drive.google.com/file/d/${node.file_id}/view`}

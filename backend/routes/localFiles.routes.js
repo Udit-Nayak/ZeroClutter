@@ -1,10 +1,17 @@
 const express = require("express");
+const upload = require("../middleware/upload");
+const {
+  scanSelectedFolder,
+  getDuplicates,
+  getLargeFiles,
+  deleteFile,
+} = require("../controllers/localFiles.controller");
+
 const router = express.Router();
-const { register, login, logout} = require("../controllers/user.controller");
 
-router.post("/register", register);
-router.post("/login", login);
-router.post("/logout", logout);
-
+router.post("/scan", upload.array("files"), scanSelectedFolder);
+router.get("/duplicates", getDuplicates);
+router.get("/large", getLargeFiles);
+router.delete("/delete", deleteFile);
 
 module.exports = router;

@@ -19,6 +19,7 @@ function GmailDashboard({ token: propToken }) {
   const [topicClusters, setTopicClusters] = useState([]);
   const [selectedTopic, setSelectedTopic] = useState(null);
   const [topicEmails, setTopicEmails] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const { mails, setMails, loading, error, setError } = useGmail(token);
   const isFetchingClusterRef = useRef(false);
 
@@ -229,11 +230,13 @@ function GmailDashboard({ token: propToken }) {
     try {
       setLoadingMode(true);
       setMode("smart");
+      setShowFilters(false);
       const res = await axios.get(
         "http://localhost:5000/api/gmail/old-unread",
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setSmartMails(res.data);
+      setUnreadCount(res.data.length);
       setSelectedMails([]);
       setError("");
     } catch (err) {
@@ -280,6 +283,7 @@ function GmailDashboard({ token: propToken }) {
         setSmartMails((prev) =>
           prev.filter((mail) => !selectedMails.includes(mail.id))
         );
+        setUnreadCount((prev) => prev - selectedMails.length);
       }
       
       setSelectedMails([]);
@@ -319,7 +323,10 @@ function GmailDashboard({ token: propToken }) {
       if (mode === "trash") setTrashMails([]);
       else if (mode === "spam") setSpamMails([]);
       else if (mode === "promotions") setPromoMails([]);
-      else if (mode === "smart") setSmartMails([]);
+      else if (mode === "smart") {
+        setSmartMails([]);
+        setUnreadCount(0);
+      }
       
       setSelectedMails([]);
       alert(`All ${mode} emails permanently deleted.`);
@@ -383,25 +390,24 @@ function GmailDashboard({ token: propToken }) {
             onDateFilter={handleDateFilterChange}
             showFilters={showFilters}
             onFetchAIScan={handleFetchTopicClusters}
+            onFetchSmartSuggestions={handleFetchSmartSuggestions}
+            loadingMode={loadingMode}
           />
 
-          {/* Smart Suggestion Button */}
-          <button
-            style={{
-              margin: "1rem 0",
-              background: "#e6f7ff",
-              border: "1px solid #1890ff",
-              color: "#1890ff",
-              padding: "0.5rem 1rem",
+          {mode === "smart" && unreadCount > 0 && (
+            <div style={{ 
+              margin: "1rem 0", 
+              padding: "0.75rem", 
+              backgroundColor: "#e6f7ff", 
+              border: "1px solid #1890ff", 
               borderRadius: "4px",
-            }}
-            onClick={handleFetchSmartSuggestions}
-            disabled={loadingMode}
-          >
-            💡 Smart Suggestion
-          </button>
+              color: "#1890ff",
+              fontWeight: "500"
+            }}>
+              💡 You have {unreadCount} unread emails from the past 6 months, want to delete them???
+            </div>
+          )}
 
-          {/* Delete Controls for deletable modes */}
           {(mode === "trash" ||
             mode === "spam" ||
             mode === "promotions" ||
@@ -428,7 +434,6 @@ function GmailDashboard({ token: propToken }) {
             </div>
           )}
 
-          {/* Topic Clusters Display */}
           {mode === "topics" &&
             Array.isArray(topicClusters) &&
             topicClusters.length > 0 && (
@@ -448,7 +453,6 @@ function GmailDashboard({ token: propToken }) {
               </div>
             )}
 
-          {/* Topic Emails Display */}
           {mode === "topics" && selectedTopic && topicEmails.length > 0 && (
             <div style={{ marginTop: "1rem" }}>
               <h4>Emails under "{selectedTopic}"</h4>
@@ -500,7 +504,6 @@ function GmailDashboard({ token: propToken }) {
         />
       )}
 
-      {/* Duplicates Table */}
       {!loading &&
         !loadingMode &&
         mode === "duplicates" &&
@@ -558,7 +561,6 @@ function GmailDashboard({ token: propToken }) {
                   cursor: "pointer",
                 }}
               >
-                {/* Show checkbox for deletable modes */}
                 {(mode === "trash" ||
                   mode === "spam" ||
                   mode === "promotions" ||
@@ -571,7 +573,6 @@ function GmailDashboard({ token: propToken }) {
                   />
                 )}
 
-                {/* Gmail message link */}
                 <a
                   href={`https://mail.google.com/mail/u/0/#inbox/${mail.id}`}
                   target="_blank"
@@ -602,7 +603,6 @@ function GmailDashboard({ token: propToken }) {
           </ul>
         )}
 
-      {/* No emails found message */}
       {!loading &&
         !loadingMode &&
         mode !== "duplicates" &&
