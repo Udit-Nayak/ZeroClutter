@@ -335,7 +335,7 @@ def map_topic_name(keywords, email_from=None):
     
     return None
 
-# Enhanced clustering with better parameters
+# Enhanced clustering with better parameters - FIXED VECTORIZER
 def get_enhanced_clustering_models(num_docs):
     # Adjust parameters based on number of documents
     if num_docs < 20:
@@ -369,13 +369,21 @@ def get_enhanced_clustering_models(num_docs):
         prediction_data=True
     )
     
-    # Enhanced vectorizer with better parameters
+    # FIXED: Enhanced vectorizer with adaptive parameters based on document count
+    # Calculate adaptive min_df to avoid the error
+    adaptive_min_df = max(1, min(2, num_docs // 50))  # At least 1, at most 2, scale with docs
+    adaptive_max_df = min(0.95, 1.0 - (1.0 / num_docs))  # Ensure max_df > min_df
+    
+    # Ensure max_features doesn't exceed reasonable limits
+    max_features = min(1000, num_docs * 10)
+    
     vectorizer_model = CountVectorizer(
         stop_words="english",
-        min_df=2,
-        max_df=0.8,
+        min_df=adaptive_min_df,
+        max_df=adaptive_max_df,
         ngram_range=(1, 2),  # Include bigrams
-        max_features=1000
+        max_features=max_features,
+        token_pattern=r'\b[a-zA-Z][a-zA-Z]+\b'  # Only alphabetic tokens, min 2 chars
     )
     
     return embedding_model, umap_model, hdbscan_model, vectorizer_model
@@ -443,76 +451,90 @@ def cluster_topics():
 
     print(f"Valid emails to cluster: {len(valid_emails)}")
 
-    # Enhanced text cleaning
-    email_texts = [clean_text(e["text"]) for e in valid_emails]
-    email_ids = [e["id"] for e in valid_emails]
-
-    # Get enhanced clustering models
-    embedding_model, umap_model, hdbscan_model, vectorizer_model = get_enhanced_clustering_models(len(valid_emails))
-
-    # Create BERTopic model with enhanced parameters
-    topic_model = BERTopic(
-        embedding_model=embedding_model,
-        umap_model=umap_model,
-        hdbscan_model=hdbscan_model,
-        vectorizer_model=vectorizer_model,
-        top_n_words=8,  # Increased for better topic representation
-        calculate_probabilities=True,
-        verbose=True,
-        nr_topics="auto"  # Let the model determine optimal number of topics
-    )
-
-    # Fit and transform
-    topics, probabilities = topic_model.fit_transform(email_texts)
-
-    # Build topic map with enhanced naming
-    topic_map = {}
-    for topic_num, eid in zip(topics, email_ids):
-        meta = next((e for e in valid_emails if e["id"] == eid), {})
+    try:
+        # Enhanced text cleaning
+        email_texts = [clean_text(e["text"]) for e in valid_emails]
         
-        try:
-            topic_label = topic_model.get_topic(topic_num)
-            if topic_label:
-                top_words = [word for word, _ in topic_label[:8]]
-                renamed = map_topic_name(top_words, meta.get("from", ""))
-                topic_name = renamed or f"Topic {topic_num}"
-            else:
+        # Filter out empty texts after cleaning
+        valid_indices = [i for i, text in enumerate(email_texts) if text.strip()]
+        if len(valid_indices) < 2:
+            return jsonify({"error": "Not enough valid text content after cleaning"}), 400
+        
+        # Keep only valid texts and corresponding emails
+        email_texts = [email_texts[i] for i in valid_indices]
+        valid_emails = [valid_emails[i] for i in valid_indices]
+        email_ids = [e["id"] for e in valid_emails]
+
+        # Get enhanced clustering models
+        embedding_model, umap_model, hdbscan_model, vectorizer_model = get_enhanced_clustering_models(len(valid_emails))
+
+        # Create BERTopic model with enhanced parameters
+        topic_model = BERTopic(
+            embedding_model=embedding_model,
+            umap_model=umap_model,
+            hdbscan_model=hdbscan_model,
+            vectorizer_model=vectorizer_model,
+            top_n_words=8,  # Increased for better topic representation
+            calculate_probabilities=True,
+            verbose=True,
+            nr_topics="auto"  # Let the model determine optimal number of topics
+        )
+
+        # Fit and transform
+        topics, probabilities = topic_model.fit_transform(email_texts)
+
+        # Build topic map with enhanced naming
+        topic_map = {}
+        for topic_num, eid in zip(topics, email_ids):
+            meta = next((e for e in valid_emails if e["id"] == eid), {})
+            
+            try:
+                topic_label = topic_model.get_topic(topic_num)
+                if topic_label:
+                    top_words = [word for word, _ in topic_label[:8]]
+                    renamed = map_topic_name(top_words, meta.get("from", ""))
+                    topic_name = renamed or f"Topic {topic_num}"
+                else:
+                    topic_name = f"Topic {topic_num}"
+            except:
                 topic_name = f"Topic {topic_num}"
-        except:
-            topic_name = f"Topic {topic_num}"
 
-        # Skip junk topics
-        if topic_name.lower() in JUNK_TOPICS or not topic_name.strip():
-            continue
+            # Skip junk topics
+            if topic_name.lower() in JUNK_TOPICS or not topic_name.strip():
+                continue
 
-        email_obj = {
-            "id": eid,
-            "subject": meta.get("subject", ""),
-            "snippet": meta.get("snippet", ""),
-            "from": meta.get("from", "Unknown"),
-            "date": meta.get("date"),
-        }
-        topic_map.setdefault(topic_name, []).append(email_obj)
+            email_obj = {
+                "id": eid,
+                "subject": meta.get("subject", ""),
+                "snippet": meta.get("snippet", ""),
+                "from": meta.get("from", "Unknown"),
+                "date": meta.get("date"),
+            }
+            topic_map.setdefault(topic_name, []).append(email_obj)
 
-    # Merge similar topics
-    topic_map = merge_similar_topics(topic_map)
+        # Merge similar topics
+        topic_map = merge_similar_topics(topic_map)
 
-    # Sort topics by number of emails (descending)
-    sorted_topics = sorted(topic_map.items(), key=lambda x: len(x[1]), reverse=True)
+        # Sort topics by number of emails (descending)
+        sorted_topics = sorted(topic_map.items(), key=lambda x: len(x[1]), reverse=True)
+        
+        # Create result with additional metadata
+        result = []
+        for topic, emails in sorted_topics:
+            if len(emails) > 0:  # Only include topics with emails
+                result.append({
+                    "topic": topic,
+                    "emails": emails,
+                    "count": len(emails),
+                    "percentage": round((len(emails) / len(valid_emails)) * 100, 1)
+                })
+
+        print(f"Generated {len(result)} topics")
+        return jsonify(result)
     
-    # Create result with additional metadata
-    result = []
-    for topic, emails in sorted_topics:
-        if len(emails) > 0:  # Only include topics with emails
-            result.append({
-                "topic": topic,
-                "emails": emails,
-                "count": len(emails),
-                "percentage": round((len(emails) / len(valid_emails)) * 100, 1)
-            })
-
-    print(f"Generated {len(result)} topics")
-    return jsonify(result)
+    except Exception as e:
+        print(f"Error during clustering: {str(e)}")
+        return jsonify({"error": f"Clustering failed: {str(e)}"}), 500
 
 if __name__ == "__main__":
     app.run(port=5001, debug=True)
