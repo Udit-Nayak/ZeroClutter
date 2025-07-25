@@ -24,7 +24,7 @@ exports.getDuplicateFiles = async (req, res) => {
     const result = await pool.query(query, [user.id]);
     res.status(200).json(result.rows);
   } catch (err) {
-    console.error("❌ Error fetching duplicate files:", err);
+    console.error("Error fetching duplicate files:", err);
     res.status(500).json({ error: "Failed to fetch duplicate files" });
   }
 };
@@ -90,7 +90,7 @@ exports.deleteDuplicates = async (req, res) => {
           requestBody: { trashed: true },
         });
 
-        console.log(`🗑️ Moved to trash: ${file.file_id}`);
+        console.log(`Moved to trash: ${file.file_id}`);
         deletedCount++;
 
         await pool.query(
@@ -108,7 +108,7 @@ exports.deleteDuplicates = async (req, res) => {
           ]
         );
       } catch (err) {
-        console.error(`❌ Failed to delete ${file.file_id}: ${err.message}`);
+        console.error(`Failed to delete ${file.file_id}: ${err.message}`);
       }
     }
 
@@ -117,7 +117,7 @@ exports.deleteDuplicates = async (req, res) => {
       deleted: deletedCount,
     });
   } catch (err) {
-    console.error("❌ Internal error while deleting duplicates:", err);
+    console.error("Internal error while deleting duplicates:", err);
     res.status(500).json({ error: "Failed to delete duplicates" });
   }
 };
