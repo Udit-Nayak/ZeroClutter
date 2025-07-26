@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Search, Mail, HardDrive, File, BarChart3, Trash2, Settings, AlertTriangle, CheckCircle2, Clock, TrendingUp, Zap, RefreshCw, Filter, Eye, Shield } from 'lucide-react';
+import { Search, Mail, HardDrive, File, BarChart3, Trash2, Settings, AlertTriangle, CheckCircle2, Clock, TrendingUp, Zap, RefreshCw, Eye, Shield } from 'lucide-react';
 import DriveDashboard from "./Drive/DriveDashboard";
 import GmailDashboard from "./Gmail/GmailDashboard";
 import LocalDashboard from "./Local/LocalDashboard";
@@ -168,9 +168,6 @@ const MainDashboard = () => {
               </div>
               
               <button className="p-2 text-gray-400 hover:text-gray-600 rounded-xl hover:bg-gray-100 transition-colors duration-200">
-                <RefreshCw size={20} />
-              </button>
-              <button className="p-2 text-gray-400 hover:text-gray-600 rounded-xl hover:bg-gray-100 transition-colors duration-200">
                 <Settings size={20} />
               </button>
               
@@ -205,7 +202,6 @@ const MainDashboard = () => {
                 icon={Mail} 
                 label="Gmail Analysis" 
                 tabKey="gmail" 
-                count={stats.duplicates > 0 ? stats.duplicates : null}
                 description="Email cleanup & organization"
               />
               <NavButton 
@@ -228,16 +224,6 @@ const MainDashboard = () => {
               />
             </nav>
             
-            {/* Enhanced Pro Tip */}
-            <div className="p-4 bg-gradient-to-br from-purple-50 to-blue-50 rounded-2xl border border-purple-200 mb-6">
-              <div className="flex items-center space-x-2 mb-3">
-                <Zap size={16} className="text-purple-600" />
-                <span className="text-sm font-medium text-purple-900">Pro Tip</span>
-              </div>
-              <p className="text-xs text-purple-700 leading-relaxed">
-                Set up automatic weekly scans to maintain optimal storage health across all your platforms.
-              </p>
-            </div>
             
             {/* System Status */}
             <div className="p-4 bg-green-50 rounded-2xl border border-green-200">
@@ -347,10 +333,7 @@ const MainDashboard = () => {
                 <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
                   <div className="flex items-center justify-between mb-6">
                     <h3 className="text-xl font-semibold text-gray-900">Recent Activity</h3>
-                    <button className="text-blue-600 hover:text-blue-700 text-sm font-medium flex items-center space-x-1 transition-colors duration-200">
-                      <Eye size={16} />
-                      <span>View All</span>
-                    </button>
+
                   </div>
                   <div className="space-y-4">
                     {[
@@ -496,14 +479,6 @@ const MainDashboard = () => {
                     <h2 className="text-3xl font-bold text-gray-900 mb-2">Gmail Analysis</h2>
                     <p className="text-gray-600 text-lg">Clean up your inbox and optimize email storage</p>
                   </div>
-                  <div className="flex items-center space-x-3">
-                    <button className="p-2 text-gray-400 hover:text-gray-600 rounded-xl hover:bg-gray-100 transition-colors duration-200">
-                      <Filter size={20} />
-                    </button>
-                    <button className="p-2 text-gray-400 hover:text-gray-600 rounded-xl hover:bg-gray-100 transition-colors duration-200">
-                      <RefreshCw size={20} />
-                    </button>
-                  </div>
                 </div>
                 
                 <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
@@ -521,9 +496,6 @@ const MainDashboard = () => {
                   </div>
                   <div className="flex items-center space-x-3">
                     <button className="p-2 text-gray-400 hover:text-gray-600 rounded-xl hover:bg-gray-100 transition-colors duration-200">
-                      <Filter size={20} />
-                    </button>
-                    <button className="p-2 text-gray-400 hover:text-gray-600 rounded-xl hover:bg-gray-100 transition-colors duration-200">
                       <RefreshCw size={20} />
                     </button>
                   </div>
@@ -539,16 +511,8 @@ const MainDashboard = () => {
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="text-3xl font-bold text-gray-900 mb-2">Local File Scanner</h2>
+                    <h2 className="text-3xl font-bold text-gray-900 mb-2">🧹 Local File Scanner</h2>
                     <p className="text-gray-600 text-lg">Scan your computer for duplicate files and space optimization</p>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <button className="p-2 text-gray-400 hover:text-gray-600 rounded-xl hover:bg-gray-100 transition-colors duration-200">
-                      <Filter size={20} />
-                    </button>
-                    <button className="p-2 text-gray-400 hover:text-gray-600 rounded-xl hover:bg-gray-100 transition-colors duration-200">
-                      <RefreshCw size={20} />
-                    </button>
                   </div>
                 </div>
                 

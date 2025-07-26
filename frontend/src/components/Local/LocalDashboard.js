@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import axios from "axios";
 
 const LocalDashboard = () => {
   const [files, setFiles] = useState([]);
@@ -11,10 +12,6 @@ const LocalDashboard = () => {
   const [error, setError] = useState(null);
   const [folderName, setFolderName] = useState("");
 
-  // Check scan status on component mount
-  useEffect(() => {
-    checkScanStatus();
-  }, []);
 
   const checkScanStatus = useCallback(async () => {
   const token = localStorage.getItem("token");
@@ -29,7 +26,7 @@ const LocalDashboard = () => {
     );
     console.log("Scan status response:", response.data);
     const scanStatus = response.data.scanStatus;
-    setIsScanCompleted(scanStatus === "completed");
+    setScanComplete(scanStatus === "completed");
   } catch (error) {
     console.error("Error checking scan status:", error);
   }
@@ -40,34 +37,6 @@ const LocalDashboard = () => {
     checkScanStatus();
   }, [checkScanStatus]);
 
-  const loadExistingData = async () => {
-    try {
-      // Load files, duplicates, and large files
-      const [filesRes, duplicatesRes, largeRes] = await Promise.all([
-        fetch("http://localhost:5000/api/localFiles/files?limit=100"),
-        fetch("http://localhost:5000/api/localFiles/duplicates"),
-        fetch("http://localhost:5000/api/localFiles/large?limit=10")
-      ]);
-
-      if (filesRes.ok) {
-        const filesData = await filesRes.json();
-        setFiles(filesData.files || []);
-      }
-
-      if (duplicatesRes.ok) {
-        const duplicatesData = await duplicatesRes.json();
-        setDuplicates(duplicatesData.duplicates || []);
-        setDuplicateGroups(duplicatesData.duplicateGroups || []);
-      }
-
-      if (largeRes.ok) {
-        const largeData = await largeRes.json();
-        setLargest(largeData.largeFiles || []);
-      }
-    } catch (err) {
-      console.error("Error loading existing data:", err);
-    }
-  };
 
   const handleFolderPick = async () => {
     setError(null);
@@ -387,21 +356,6 @@ const LocalDashboard = () => {
     }
   };
 
-  // Function to help users locate duplicate files
-  const showFileLocation = (filePath) => {
-    const locationInfo = `📍 File Location:\n\n${filePath}\n\n💡 Tip: Copy this path and paste it in your file explorer address bar to navigate directly to the file.`;
-    alert(locationInfo);
-    
-    // Copy path to clipboard if possible
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(filePath).then(() => {
-        console.log("File path copied to clipboard");
-      }).catch(err => {
-        console.warn("Could not copy to clipboard:", err);
-      });
-    }
-  };
-
   const formatFileSize = (bytes) => {
     if (!bytes || bytes === 0) return '0 Bytes';
     const k = 1024;
@@ -418,9 +372,6 @@ const LocalDashboard = () => {
   return (
     <div className="p-6 max-w-7xl mx-auto">
       <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-        <h1 className="text-4xl font-bold mb-4 text-gray-800 flex items-center">
-          🧹 <span className="ml-2">Local Storage Cleaner</span>
-        </h1>
         
         {/* Browser Limitation Notice */}
         <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
@@ -523,13 +474,6 @@ const LocalDashboard = () => {
                     </div>
                     <div className="flex items-center ml-2 space-x-1">
                       <button
-                        onClick={() => showFileLocation(file.fullPath)}
-                        className="text-blue-600 hover:text-blue-800 text-sm px-2 py-1 rounded hover:bg-blue-50"
-                        title="Show file location"
-                      >
-                        📍
-                      </button>
-                      <button
                         onClick={() => handleDeleteFile(file.fullPath, file.name)}
                         className="text-red-600 hover:text-red-800 text-sm px-2 py-1 rounded hover:bg-red-50"
                         title="Remove from scan"
@@ -580,13 +524,6 @@ const LocalDashboard = () => {
                         </div>
                         <div className="flex items-center ml-2 space-x-1">
                           <button
-                            onClick={() => showFileLocation(file.fullPath)}
-                            className="text-blue-600 hover:text-blue-800 text-xs px-1 py-1 rounded hover:bg-blue-100"
-                            title="Show file location"
-                          >
-                            📍
-                          </button>
-                          <button
                             onClick={() => handleDeleteFile(file.fullPath, file.name)}
                             className="text-red-600 hover:text-red-800 text-xs px-1 py-1 rounded hover:bg-red-100"
                             title="Remove from scan"
@@ -623,13 +560,6 @@ const LocalDashboard = () => {
                       </div>
                     </div>
                     <div className="flex items-center ml-2 space-x-1">
-                      <button
-                        onClick={() => showFileLocation(file.fullPath)}
-                        className="text-blue-600 hover:text-blue-800 text-sm px-2 py-1 rounded hover:bg-blue-50"
-                        title="Show file location"
-                      >
-                        📍
-                      </button>
                       <button
                         onClick={() => handleDeleteFile(file.fullPath, file.name)}
                         className="text-red-600 hover:text-red-800 text-sm px-2 py-1 rounded hover:bg-red-50"

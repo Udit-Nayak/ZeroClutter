@@ -84,7 +84,6 @@ useEffect(() => {
 
   return (
     <div style={{ padding: "2rem" }}>
-      <h2>Your Drive Files</h2>
       {error && <p style={{ color: "red" }}>{error}</p>}
 
       {isAuthenticated && (
