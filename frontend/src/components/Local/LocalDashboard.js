@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 
 const LocalDashboard = () => {
   const [files, setFiles] = useState([]);
@@ -16,23 +16,29 @@ const LocalDashboard = () => {
     checkScanStatus();
   }, []);
 
-  const checkScanStatus = async () => {
-    try {
-      const response = await fetch("http://localhost:5000/api/localFiles/status");
-      if (response.ok) {
-        const data = await response.json();
-        if (data.hasData) {
-          setStats(data);
-          setFolderName(data.folderName);
-          setScanComplete(true);
-          // Load the existing data
-          await loadExistingData();
-        }
+  const checkScanStatus = useCallback(async () => {
+  const token = localStorage.getItem("token");
+  try {
+    const response = await axios.get(
+      `${import.meta.env.VITE_BACKEND_URL}/scanstatus`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       }
-    } catch (err) {
-      console.error("Error checking scan status:", err);
-    }
-  };
+    );
+    console.log("Scan status response:", response.data);
+    const scanStatus = response.data.scanStatus;
+    setIsScanCompleted(scanStatus === "completed");
+  } catch (error) {
+    console.error("Error checking scan status:", error);
+  }
+}, []);
+
+
+  useEffect(() => {
+    checkScanStatus();
+  }, [checkScanStatus]);
 
   const loadExistingData = async () => {
     try {
@@ -350,9 +356,10 @@ const LocalDashboard = () => {
       alert("❌ Error removing file from scan: " + err.message);
     }
   };
-
+  
   const handleClearCache = async () => {
-    if (!confirm("Are you sure you want to clear all scan data?")) {
+    const isConfirmed = window.confirm("Are you sure?");
+    if (isConfirmed) {
       return;
     }
 
