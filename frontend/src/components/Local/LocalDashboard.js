@@ -159,7 +159,8 @@ const LocalDashboard = () => {
               size: file.size,
               type: file.type || getFileExtension(file.name),
               lastModified: file.lastModified,
-              contentHash: await generateFileHash(file)
+              contentHash: await generateImprovedFileHash(file),
+              fileHandle: entry // Store handle for potential future operations
             };
             
             files.push(fileData);
@@ -196,32 +197,87 @@ const LocalDashboard = () => {
     );
   };
 
-  const generateFileHash = async (file) => {
+  // Improved file hash generation for better duplicate detection
+  const generateImprovedFileHash = async (file) => {
     try {
-      // For performance, only hash first 64KB for files larger than 1MB
-      const chunkSize = file.size > 1024 * 1024 ? 65536 : Math.min(file.size, 65536);
-      const chunk = file.slice(0, chunkSize);
-      const buffer = await chunk.arrayBuffer();
-      
-      // Create a simple hash using file metadata and content sample
-      const hashInput = `${file.name}-${file.size}-${file.lastModified}-${new Uint8Array(buffer).slice(0, 1000).join('')}`;
-      
-      // Use built-in crypto API if available, otherwise fallback
-      if (window.crypto && window.crypto.subtle) {
-        const hashBuffer = await window.crypto.subtle.digest('SHA-256', new TextEncoder().encode(hashInput));
-        return Array.from(new Uint8Array(hashBuffer))
-          .map(b => b.toString(16).padStart(2, '0'))
-          .join('')
-          .substring(0, 20);
-      } else {
-        // Fallback hash
-        return btoa(hashInput).replace(/[^a-zA-Z0-9]/g, '').substring(0, 20);
+      // For small files (<10MB), hash the entire content
+      if (file.size <= 10 * 1024 * 1024) {
+        const buffer = await file.arrayBuffer();
+        return await hashBuffer(buffer);
       }
+      
+      // For larger files, use a more sophisticated approach
+      // Hash: beginning + middle + end + metadata
+      const chunkSize = 64 * 1024; // 64KB chunks
+      const chunks = [];
+      
+      // Beginning chunk
+      chunks.push(file.slice(0, chunkSize));
+      
+      // Middle chunk
+      const middleStart = Math.floor(file.size / 2) - Math.floor(chunkSize / 2);
+      chunks.push(file.slice(middleStart, middleStart + chunkSize));
+      
+      // End chunk
+      chunks.push(file.slice(-chunkSize));
+      
+      // Combine all chunks
+      const combinedChunks = [];
+      for (const chunk of chunks) {
+        const buffer = await chunk.arrayBuffer();
+        combinedChunks.push(new Uint8Array(buffer));
+      }
+      
+      // Add file metadata to make hash more unique
+      const metadata = `${file.size}-${file.lastModified}-${file.type}`;
+      combinedChunks.push(new TextEncoder().encode(metadata));
+      
+      // Create final buffer and hash
+      const totalLength = combinedChunks.reduce((sum, chunk) => sum + chunk.length, 0);
+      const finalBuffer = new Uint8Array(totalLength);
+      let offset = 0;
+      
+      for (const chunk of combinedChunks) {
+        finalBuffer.set(chunk, offset);
+        offset += chunk.length;
+      }
+      
+      return await hashBuffer(finalBuffer.buffer);
+      
     } catch (err) {
-      console.warn("Error generating file hash:", err);
-      // Fallback hash based on file metadata only
-      return btoa(`${file.name}-${file.size}-${file.lastModified}`).replace(/[^a-zA-Z0-9]/g, '').substring(0, 20);
+      console.warn("Error generating improved file hash:", err);
+      // Fallback to simple hash
+      return generateSimpleFileHash(file);
     }
+  };
+
+  // Hash buffer using Web Crypto API
+  const hashBuffer = async (buffer) => {
+    if (window.crypto && window.crypto.subtle) {
+      const hashBuffer = await window.crypto.subtle.digest('SHA-256', buffer);
+      return Array.from(new Uint8Array(hashBuffer))
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('')
+        .substring(0, 32); // Use longer hash for better uniqueness
+    } else {
+      // Fallback for older browsers
+      return generateSimpleHashFromBuffer(buffer);
+    }
+  };
+
+  // Simple fallback hash generation
+  const generateSimpleFileHash = async (file) => {
+    const hashInput = `${file.name}-${file.size}-${file.lastModified}`;
+    return btoa(hashInput).replace(/[^a-zA-Z0-9]/g, '').substring(0, 20);
+  };
+
+  const generateSimpleHashFromBuffer = (buffer) => {
+    const view = new Uint8Array(buffer);
+    let hash = 0;
+    for (let i = 0; i < Math.min(view.length, 1000); i++) {
+      hash = ((hash << 5) - hash + view[i]) & 0xffffffff;
+    }
+    return Math.abs(hash).toString(16).padStart(8, '0');
   };
 
   const getFileExtension = (filename) => {
@@ -242,9 +298,18 @@ const LocalDashboard = () => {
   };
 
   const handleDeleteFile = async (filePath, fileName) => {
-    if (!confirm(`Are you sure you want to delete: ${fileName}?`)) {
-      return;
-    }
+    const isConfirmed = window.confirm(
+      `⚠️ BROWSER LIMITATION NOTICE ⚠️\n\n` +
+      `Due to browser security restrictions, files cannot be automatically deleted from your computer.\n\n` +
+      `File: ${fileName}\n\n` +
+      `This will only remove the file from the scan results.\n\n` +
+      `To actually delete the file, you need to:\n` +
+      `1. Navigate to the file location manually\n` +
+      `2. Delete it using your file explorer\n\n` +
+      `Continue to remove from scan results?`
+    );
+
+    if (!isConfirmed) return;
 
     try {
       const response = await fetch("http://localhost:5000/api/localFiles/delete", {
@@ -276,13 +341,13 @@ const LocalDashboard = () => {
           }));
         }
         
-        alert(result.message || "File processed successfully!");
+        alert("✅ File removed from scan results!\n\n📝 Note: To delete the actual file, please use your file explorer.");
       } else {
-        throw new Error(result.message || "Failed to delete file");
+        throw new Error(result.message || "Failed to remove file from scan");
       }
     } catch (err) {
       console.error("Delete error:", err);
-      alert("Error processing file: " + err.message);
+      alert("❌ Error removing file from scan: " + err.message);
     }
   };
 
@@ -315,6 +380,21 @@ const LocalDashboard = () => {
     }
   };
 
+  // Function to help users locate duplicate files
+  const showFileLocation = (filePath) => {
+    const locationInfo = `📍 File Location:\n\n${filePath}\n\n💡 Tip: Copy this path and paste it in your file explorer address bar to navigate directly to the file.`;
+    alert(locationInfo);
+    
+    // Copy path to clipboard if possible
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(filePath).then(() => {
+        console.log("File path copied to clipboard");
+      }).catch(err => {
+        console.warn("Could not copy to clipboard:", err);
+      });
+    }
+  };
+
   const formatFileSize = (bytes) => {
     if (!bytes || bytes === 0) return '0 Bytes';
     const k = 1024;
@@ -325,7 +405,7 @@ const LocalDashboard = () => {
 
   const getScanProgress = () => {
     if (!isScanning) return null;
-    return "Scanning folder... Please wait.";
+    return "Scanning folder and analyzing file content... Please wait.";
   };
 
   return (
@@ -334,6 +414,20 @@ const LocalDashboard = () => {
         <h1 className="text-4xl font-bold mb-4 text-gray-800 flex items-center">
           🧹 <span className="ml-2">Local Storage Cleaner</span>
         </h1>
+        
+        {/* Browser Limitation Notice */}
+        <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <div className="flex items-start">
+            <span className="text-yellow-500 mr-2 text-xl">⚠️</span>
+            <div>
+              <p className="text-yellow-800 font-medium">Browser Security Notice</p>
+              <p className="text-yellow-700 text-sm">
+                Due to browser security restrictions, this tool can only scan and identify files - it cannot automatically delete them. 
+                You'll need to manually delete files using your file explorer.
+              </p>
+            </div>
+          </div>
+        </div>
         
         {stats && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 text-sm">
@@ -420,13 +514,22 @@ const LocalDashboard = () => {
                         {formatFileSize(file.size)} • {file.type}
                       </p>
                     </div>
-                    <button
-                      onClick={() => handleDeleteFile(file.fullPath, file.name)}
-                      className="ml-2 text-red-600 hover:text-red-800 text-sm px-2 py-1 rounded hover:bg-red-50"
-                      title="Remove from scan"
-                    >
-                      🗑️
-                    </button>
+                    <div className="flex items-center ml-2 space-x-1">
+                      <button
+                        onClick={() => showFileLocation(file.fullPath)}
+                        className="text-blue-600 hover:text-blue-800 text-sm px-2 py-1 rounded hover:bg-blue-50"
+                        title="Show file location"
+                      >
+                        📍
+                      </button>
+                      <button
+                        onClick={() => handleDeleteFile(file.fullPath, file.name)}
+                        className="text-red-600 hover:text-red-800 text-sm px-2 py-1 rounded hover:bg-red-50"
+                        title="Remove from scan"
+                      >
+                        🗑️
+                      </button>
+                    </div>
                   </div>
                 )) : <p className="text-gray-500 text-center py-4">No files found</p>}
                 {files?.length > 50 && (
@@ -444,6 +547,11 @@ const LocalDashboard = () => {
               <h2 className="text-xl font-semibold flex items-center">
                 🔄 <span className="ml-2">Duplicate Files ({duplicates?.length || 0})</span>
               </h2>
+              {duplicateGroups?.length > 0 && (
+                <p className="text-red-200 text-sm mt-1">
+                  Found {duplicateGroups.length} groups of identical files
+                </p>
+              )}
             </div>
             <div className="p-4">
               <div className="max-h-96 overflow-y-auto">
@@ -453,7 +561,7 @@ const LocalDashboard = () => {
                       <span className="bg-red-200 text-red-800 px-2 py-1 rounded text-xs mr-2">
                         Group {groupIndex + 1}
                       </span>
-                      {group.length} identical files
+                      {group.length} identical files • {formatFileSize(group[0].size)} each
                     </p>
                     {group.map((file, i) => (
                       <div key={i} className="flex justify-between items-center py-1 pl-4">
@@ -461,15 +569,24 @@ const LocalDashboard = () => {
                           <p className="text-xs text-gray-700 truncate" title={file.fullPath}>
                             {file.name}
                           </p>
-                          <p className="text-xs text-gray-500">{formatFileSize(file.size)}</p>
+                          <p className="text-xs text-gray-500">{file.fullPath}</p>
                         </div>
-                        <button
-                          onClick={() => handleDeleteFile(file.fullPath, file.name)}
-                          className="ml-2 text-red-600 hover:text-red-800 text-xs px-1 py-1 rounded hover:bg-red-100"
-                          title="Remove from scan"
-                        >
-                          🗑️
-                        </button>
+                        <div className="flex items-center ml-2 space-x-1">
+                          <button
+                            onClick={() => showFileLocation(file.fullPath)}
+                            className="text-blue-600 hover:text-blue-800 text-xs px-1 py-1 rounded hover:bg-blue-100"
+                            title="Show file location"
+                          >
+                            📍
+                          </button>
+                          <button
+                            onClick={() => handleDeleteFile(file.fullPath, file.name)}
+                            className="text-red-600 hover:text-red-800 text-xs px-1 py-1 rounded hover:bg-red-100"
+                            title="Remove from scan"
+                          >
+                            🗑️
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -498,13 +615,22 @@ const LocalDashboard = () => {
                         <span className="text-xs text-gray-500">#{i + 1}</span>
                       </div>
                     </div>
-                    <button
-                      onClick={() => handleDeleteFile(file.fullPath, file.name)}
-                      className="ml-2 text-red-600 hover:text-red-800 text-sm px-2 py-1 rounded hover:bg-red-50"
-                      title="Remove from scan"
-                    >
-                      🗑️
-                    </button>
+                    <div className="flex items-center ml-2 space-x-1">
+                      <button
+                        onClick={() => showFileLocation(file.fullPath)}
+                        className="text-blue-600 hover:text-blue-800 text-sm px-2 py-1 rounded hover:bg-blue-50"
+                        title="Show file location"
+                      >
+                        📍
+                      </button>
+                      <button
+                        onClick={() => handleDeleteFile(file.fullPath, file.name)}
+                        className="text-red-600 hover:text-red-800 text-sm px-2 py-1 rounded hover:bg-red-50"
+                        title="Remove from scan"
+                      >
+                        🗑️
+                      </button>
+                    </div>
                   </div>
                 )) : <p className="text-gray-500 text-center py-4">No large files found</p>}
               </div>
@@ -519,6 +645,9 @@ const LocalDashboard = () => {
           <p className="text-gray-500 text-lg mb-2">Select a folder to start scanning</p>
           <p className="text-gray-400 text-sm">
             Find duplicate files and large files taking up space on your computer
+          </p>
+          <p className="text-gray-400 text-xs mt-2">
+            Advanced content-based duplicate detection • Handles renamed files automatically
           </p>
         </div>
       )}
