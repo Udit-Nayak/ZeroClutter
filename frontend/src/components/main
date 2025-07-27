@@ -97,7 +97,7 @@ const MainDashboard = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     if (token) {

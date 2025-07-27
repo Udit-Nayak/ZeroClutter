@@ -43,6 +43,11 @@ exports.login = async (req, res) => {
     if (!isMatch) {
       return res.status(401).json({ error: "Invalid credentials" });
     }
+    await pool.query(
+  "UPDATE users SET last_opened_at = CURRENT_TIMESTAMP WHERE id = $1",
+  [user.id]
+);
+
     const token = generateToken(user.id, res);
     const { password: _, ...userSafe } = user;
     res
@@ -77,7 +82,7 @@ exports.profile = async (req, res) => {
     console.log("✅ JWT decoded successfully:", decoded);
 
     const result = await pool.query(
-      "SELECT id, username, email, avatar FROM users WHERE id = $1",
+      "SELECT id, username, email, avatar, last_opened_at FROM users WHERE id = $1",
       [decoded.userId]
     );
 
@@ -89,16 +94,26 @@ exports.profile = async (req, res) => {
     }
 
     const user = result.rows[0];
+
+    const driveFileCountResult = await pool.query(
+  "SELECT COUNT(*) FROM drive_files WHERE user_id = $1",
+  [user.id]
+);
+const driveFileCount = parseInt(driveFileCountResult.rows[0].count, 10);
+
     console.log("👤 User found:", {
       id: user.id,
       username: user.username,
       email: user.email,
+      last_opened_at: user.last_opened_at,
     });
 
     const responseData = {
       name: user.username,
       email: user.email,
       picture: user.avatar,
+      last_opened_at: user.last_opened_at,
+      drive_file_count: driveFileCount,
     };
 
     console.log("📤 Sending response:", responseData);

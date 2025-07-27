@@ -8,7 +8,7 @@ function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState(null);
-  const [stats, setStats] = useState({
+  const [stats] = useState({
     totalFiles: 0,
     duplicates: 0,
     spaceSaved: 0,
@@ -23,8 +23,8 @@ function App() {
     if (urlToken) {
       setToken(urlToken);
       setIsAuthenticated(true);
-      // Mock user data - replace with actual API call
-      setUser({ name: "John Doe", email: "john@example.com" });
+    const newURL = window.location.origin + window.location.pathname;
+    window.history.replaceState({}, document.title, newURL);
     }
   }, []);
 

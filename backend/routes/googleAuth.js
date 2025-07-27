@@ -51,7 +51,7 @@ router.get("/callback", async (req, res) => {
     const user = result.rows[0];
 
     await pool.query(
-      "UPDATE users SET google_tokens = $1,username=$2,avatar=$3 WHERE id = $4",
+      "UPDATE users SET last_opened_at = CURRENT_TIMESTAMP, google_tokens = $1, username = $2, avatar = $3 WHERE id = $4",
       [tokens, name, picture, user.id]
     );
 
