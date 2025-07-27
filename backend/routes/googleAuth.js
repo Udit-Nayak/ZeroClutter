@@ -12,10 +12,10 @@ router.get("/login", (req, res) => {
     access_type: "offline",
     prompt: "consent", // <-- FORCE user to approve again
     scope: [
-      "https://www.googleapis.com/auth/drive", 
+      "https://www.googleapis.com/auth/drive",
       "https://www.googleapis.com/auth/userinfo.email",
       "https://www.googleapis.com/auth/userinfo.profile",
-      "https://www.googleapis.com/auth/gmail.readonly", 
+      "https://www.googleapis.com/auth/gmail.readonly",
       "https://mail.google.com/",
       "openid",
     ],
@@ -38,7 +38,7 @@ router.get("/callback", async (req, res) => {
     });
 
     const userInfo = await oauth2.userinfo.get();
-    const email = userInfo.data.email;
+    const { email, name, picture } = userInfo.data;
 
     const result = await pool.query("SELECT * FROM users WHERE email = $1", [
       email,
@@ -50,10 +50,17 @@ router.get("/callback", async (req, res) => {
 
     const user = result.rows[0];
 
-    await pool.query("UPDATE users SET google_tokens = $1 WHERE id = $2", [
-      tokens,
-      user.id,
-    ]);
+    await pool.query(
+      "UPDATE users SET google_tokens = $1,username=$2,avatar=$3 WHERE id = $4",
+      [tokens, name, picture, user.id]
+    );
+
+    const payload = {
+      userId: user.id,
+      name,
+      email,
+      picture,
+    };
 
     const accessToken = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, {
       expiresIn: "1d",
