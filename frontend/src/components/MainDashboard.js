@@ -5,7 +5,6 @@ import {
   HardDrive,
   File,
   BarChart3,
-  Trash2,
   AlertTriangle,
   CheckCircle2,
   Clock,
@@ -28,6 +27,7 @@ const MainDashboard = () => {
     spaceSaved: 0,
     lastScan: null,
   });
+  const [isRescanning, setIsRescanning] = useState(false);
   const [duplicateStats, setDuplicateStats] = useState({
     duplicateCount: 0,
     wastedSpace: 0,
@@ -86,6 +86,39 @@ const MainDashboard = () => {
       console.error("Failed to fetch duplicate stats:", error);
     }
   }, [token]);
+  // NEW FUNCTION: Handle Drive Rescan
+const handleRescanDriveFiles = async () => {
+  if (!token) return;
+
+  try {
+    setIsRescanning(true);
+    console.log("Starting drive rescan...");
+    
+    const response = await fetch("http://localhost:5000/api/driveFiles/rescan", {
+      method: "POST",
+      headers: { 
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({})
+    });
+    
+    if (!response.ok) throw new Error("Failed to rescan drive");
+    
+    // Refresh user profile and duplicate stats after rescan
+    await Promise.all([
+      fetchUserProfile(),
+      fetchDuplicateStats()
+    ]);
+    
+    alert("Drive rescan completed and files updated!");
+  } catch (err) {
+    console.error("Failed to rescan drive:", err);
+    alert("Failed to rescan drive. Please try again.");
+  } finally {
+    setIsRescanning(false);
+  }
+};
 
 const handleLogout = async () => {
     try {
@@ -391,12 +424,6 @@ const fetchUserStats = useCallback(async () => {
                 label="Local Files"
                 tabKey="local"
                 description="Computer file scanner"
-              />
-              <NavButton
-                icon={Trash2}
-                label="Cleanup Center"
-                tabKey="cleanup"
-                description="Review & manage duplicates"
               />
             </nav>
 
@@ -740,10 +767,22 @@ const fetchUserStats = useCallback(async () => {
                     </p>
                   </div>
                   <div className="flex items-center space-x-3">
-                    <button className="p-2 text-gray-400 hover:text-gray-600 rounded-xl hover:bg-gray-100 transition-colors duration-200">
-                      <RefreshCw size={20} />
-                    </button>
-                  </div>
+  <button 
+    onClick={handleRescanDriveFiles}
+    disabled={isRescanning}
+    className={`p-2 rounded-xl transition-colors duration-200 ${
+      isRescanning 
+        ? 'text-gray-400 cursor-not-allowed' 
+        : 'text-gray-400 hover:text-blue-600 hover:bg-blue-100'
+    }`}
+    title={isRescanning ? "Rescanning..." : "Rescan Google Drive"}
+  >
+    <RefreshCw 
+      size={20} 
+      className={isRescanning ? 'animate-spin' : ''} 
+    />
+  </button>
+</div>
                 </div>
 
                 <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
@@ -768,54 +807,6 @@ const fetchUserStats = useCallback(async () => {
 
                 <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
                   <LocalDashboard />
-                </div>
-              </div>
-            )}
-
-            {activeTab === "cleanup" && (
-              <div className="space-y-6">
-                <div>
-                  <h2 className="text-3xl font-bold text-gray-900 mb-2">
-                    Cleanup Center
-                  </h2>
-                  <p className="text-gray-600 text-lg">
-                    Review and manage identified duplicates across all platforms
-                  </p>
-                </div>
-
-                <div className="bg-white rounded-2xl p-8 border border-gray-200 shadow-sm">
-                  <div className="text-center py-12">
-                    <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-100 rounded-2xl mb-4">
-                      <Trash2 size={32} className="text-gray-400" />
-                    </div>
-                    <h3 className="text-xl font-medium text-gray-900 mb-2">
-                      No Items to Clean
-                    </h3>
-                    <p className="text-gray-600 mb-8 max-w-md mx-auto leading-relaxed">
-                      Run analysis on your Gmail, Google Drive, or local files
-                      to discover duplicates and optimization opportunities.
-                    </p>
-                    <div className="flex justify-center space-x-4">
-                      <button
-                        onClick={() => setActiveTab("gmail")}
-                        className="bg-gradient-to-r from-red-500 to-pink-600 text-white py-3 px-6 rounded-xl hover:from-red-600 hover:to-pink-700 transition-all duration-200 font-medium shadow-sm hover:shadow-md transform hover:-translate-y-0.5"
-                      >
-                        Scan Gmail
-                      </button>
-                      <button
-                        onClick={() => setActiveTab("drive")}
-                        className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white py-3 px-6 rounded-xl hover:from-blue-600 hover:to-cyan-700 transition-all duration-200 font-medium shadow-sm hover:shadow-md transform hover:-translate-y-0.5"
-                      >
-                        Scan Drive
-                      </button>
-                      <button
-                        onClick={() => setActiveTab("local")}
-                        className="bg-gradient-to-r from-green-500 to-emerald-600 text-white py-3 px-6 rounded-xl hover:from-green-600 hover:to-emerald-700 transition-all duration-200 font-medium shadow-sm hover:shadow-md transform hover:-translate-y-0.5"
-                      >
-                        Scan Local
-                      </button>
-                    </div>
-                  </div>
                 </div>
               </div>
             )}

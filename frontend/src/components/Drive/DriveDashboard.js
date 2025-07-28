@@ -7,7 +7,6 @@ import {
   Copy, 
   Trash2, 
   FileText, 
-  RotateCcw, 
   Filter,
   Search,
   SortAsc,
@@ -16,8 +15,8 @@ import {
   AlertTriangle
 } from "lucide-react";
 
-// Enhanced DriveToolbar component
-function DriveToolbar({ onList, onDuplicate, onRescan, onTrash, onReports, loading }) {
+// Enhanced DriveToolbar component (without Rescan)
+function DriveToolbar({ onList, onDuplicate, onTrash, onReports, loading }) {
   const buttonStyle = {
     display: "flex",
     alignItems: "center",
@@ -174,33 +173,6 @@ function DriveToolbar({ onList, onDuplicate, onRescan, onTrash, onReports, loadi
           <FileText size={16} />
           Reports
         </button>
-        
-        <button 
-          onClick={onRescan}
-          style={buttonStyle}
-          disabled={loading}
-          onMouseEnter={(e) => {
-            if (!loading) {
-              e.target.style.backgroundColor = "#ecfdf5";
-              e.target.style.borderColor = "#10b981";
-              e.target.style.color = "#059669";
-              e.target.style.transform = "translateY(-1px)";
-              e.target.style.boxShadow = "0 4px 6px -1px rgba(0, 0, 0, 0.1)";
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (!loading) {
-              e.target.style.backgroundColor = "#ffffff";
-              e.target.style.borderColor = "#e2e8f0";
-              e.target.style.color = "#475569";
-              e.target.style.transform = "translateY(0)";
-              e.target.style.boxShadow = "0 1px 2px 0 rgba(0, 0, 0, 0.05)";
-            }
-          }}
-        >
-          <RotateCcw size={16} />
-          Rescan
-        </button>
       </div>
     </div>
   );
@@ -278,7 +250,6 @@ function FilterPanel({ filters, onChange, onApply }) {
             fontSize: "0.875rem", 
             fontWeight: "500",
             color: "#374151",
-            display: "flex",
             alignItems: "center",
             gap: "0.5rem"
           }}>
@@ -325,7 +296,6 @@ function FilterPanel({ filters, onChange, onApply }) {
             fontSize: "0.875rem", 
             fontWeight: "500",
             color: "#374151",
-            display: "flex",
             alignItems: "center",
             gap: "0.5rem"
           }}>
@@ -435,29 +405,6 @@ function DriveDashboard({ token: propToken }) {
     }
   };
 
-  const handleRescanDriveFiles = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch("http://localhost:5000/api/driveFiles/rescan", {
-        method: "POST",
-        headers: { 
-          "Authorization": `Bearer ${token}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({})
-      });
-      
-      if (!response.ok) throw new Error("Failed to rescan drive");
-      
-      alert("Rescan completed and files updated!");
-      fetchDriveFiles();
-    } catch (err) {
-      setError("Failed to rescan drive");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <div style={{ 
       padding: "2rem",
@@ -487,7 +434,6 @@ function DriveDashboard({ token: propToken }) {
           <DriveToolbar
             onList={() => fetchDriveFiles()}
             onDuplicate={() => fetchDriveFiles(true)}
-            onRescan={handleRescanDriveFiles}
             onTrash={handleEmptyTrash}
             onReports={() => (window.location.href = `/reports?token=${token}`)}
             loading={loading}
