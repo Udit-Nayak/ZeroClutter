@@ -7,5 +7,7 @@ router.post("/scan", protectRoute, driveFilesController.scanDriveFiles);
 router.post("/rescan", protectRoute, driveFilesController.rescanDriveFiles);
 router.get("/list", protectRoute, driveFilesController.listDriveFiles);
 router.post("/emptyTrash",protectRoute,driveFilesController.emptyTrash);
+router.get("/duplicates/stats", protectRoute, driveFilesController.getDuplicateStats);
+
 
 module.exports = router;

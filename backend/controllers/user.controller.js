@@ -43,10 +43,6 @@ exports.login = async (req, res) => {
     if (!isMatch) {
       return res.status(401).json({ error: "Invalid credentials" });
     }
-    await pool.query(
-  "UPDATE users SET last_opened_at = CURRENT_TIMESTAMP WHERE id = $1",
-  [user.id]
-);
 
     const token = generateToken(user.id, res);
     const { password: _, ...userSafe } = user;
@@ -59,11 +55,67 @@ exports.login = async (req, res) => {
   }
 };
 
-exports.logout = (req, res) => {
-  clearToken(res);
-  res.status(200).json({ message: "Logged out successfully" });
-};
+exports.logout = async (req, res) => {
+  try {
+    console.log("🚪 Logout endpoint hit!");
+    console.log("📋 Headers received:", req.headers);
+    
+    const authHeader = req.headers.authorization;
+    let userId = null;
 
+    console.log("🔍 Auth header:", authHeader);
+
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      const token = authHeader.split(" ")[1];
+      console.log("🎫 Token extracted:", token.substring(0, 20) + "...");
+      
+      try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        userId = decoded.userId;
+        console.log("✅ JWT decoded successfully, userId:", userId);
+      } catch (jwtError) {
+        console.log("⚠️ JWT verification failed during logout:", jwtError.message);
+      }
+    } else {
+      console.log("❌ No valid Authorization header found");
+    }
+
+    // Update last_opened_at to current timestamp before logout
+    if (userId) {
+      console.log("🔄 Attempting to update last_opened_at for user:", userId);
+      
+      const updateResult = await pool.query(
+        "UPDATE users SET last_opened_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING last_opened_at",
+        [userId]
+      );
+      
+      console.log("✅ Updated last_opened_at for user:", userId);
+      console.log("📅 New last_opened_at:", updateResult.rows[0]?.last_opened_at);
+    } else {
+      console.log("⚠️ No userId found, skipping database update");
+    }
+
+    clearToken(res);
+    
+    res.status(200).json({ 
+      message: "Logged out successfully",
+      timestamp: new Date().toISOString(),
+      userId: userId // For debugging only - remove in production
+    });
+  } catch (err) {
+    console.error("💥 Logout error:", err.message);
+    console.error("📍 Error stack:", err.stack);
+    
+    // Even if there's an error updating the database, still clear the token
+    clearToken(res);
+    
+    res.status(200).json({ 
+      message: "Logged out successfully", 
+      warning: "Could not update last activity time",
+      error: err.message // For debugging only - remove in production
+    });
+  }
+};
 exports.profile = async (req, res) => {
   try {
     console.log("🔍 Profile endpoint hit!");
@@ -96,10 +148,10 @@ exports.profile = async (req, res) => {
     const user = result.rows[0];
 
     const driveFileCountResult = await pool.query(
-  "SELECT COUNT(*) FROM drive_files WHERE user_id = $1",
-  [user.id]
-);
-const driveFileCount = parseInt(driveFileCountResult.rows[0].count, 10);
+      "SELECT COUNT(*) FROM drive_files WHERE user_id = $1",
+      [user.id]
+    );
+    const driveFileCount = parseInt(driveFileCountResult.rows[0].count, 10);
 
     console.log("👤 User found:", {
       id: user.id,

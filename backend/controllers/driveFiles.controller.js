@@ -206,6 +206,61 @@ const listDriveFiles = async (req, res) => {
   }
 };
 
+// NEW FUNCTION: Get duplicate statistics
+const getDuplicateStats = async (req, res) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      return res.status(400).json({ error: "User not authenticated" });
+    }
+
+    const duplicateQuery = `
+      SELECT 
+        content_hash,
+        size,
+        COUNT(*) as duplicate_count,
+        (COUNT(*) - 1) as extra_files,
+        ((COUNT(*) - 1) * size) as wasted_space
+      FROM drive_files 
+      WHERE user_id = $1 
+        AND content_hash IS NOT NULL 
+        AND content_hash != '' 
+        AND size > 0
+      GROUP BY content_hash, size
+      HAVING COUNT(*) > 1
+    `;
+
+    const result = await pool.query(duplicateQuery, [user.id]);
+    
+    let totalDuplicates = 0;
+    let totalWastedSpace = 0;
+
+    result.rows.forEach(row => {
+      totalDuplicates += parseInt(row.extra_files);
+      totalWastedSpace += parseInt(row.wasted_space);
+    });
+
+    const formatBytes = (bytes) => {
+      if (bytes === 0) return '0 B';
+      const k = 1024;
+      const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    };
+
+    res.json({
+      duplicateCount: totalDuplicates,
+      wastedSpace: totalWastedSpace,
+      wastedSpaceFormatted: formatBytes(totalWastedSpace),
+      duplicateGroups: result.rows.length
+    });
+
+  } catch (err) {
+    console.error("❌ Error fetching duplicate stats:", err);
+    res.status(500).json({ error: "Failed to fetch duplicate statistics" });
+  }
+};
+
 const emptyTrash = async (req, res) => {
   try {
     const user = req.user;
@@ -251,4 +306,5 @@ module.exports = {
   listDriveFiles,
   emptyTrash,
   rescanDriveFiles,
+  getDuplicateStats, // Export the new function
 };

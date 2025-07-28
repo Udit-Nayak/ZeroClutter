@@ -9,7 +9,6 @@ import {
   AlertTriangle,
   CheckCircle2,
   Clock,
-  TrendingUp,
   Zap,
   RefreshCw,
   Shield,
@@ -28,6 +27,12 @@ const MainDashboard = () => {
     duplicates: 0,
     spaceSaved: 0,
     lastScan: null,
+  });
+  const [duplicateStats, setDuplicateStats] = useState({
+    duplicateCount: 0,
+    wastedSpace: 0,
+    wastedSpaceFormatted: "0 B",
+    duplicateGroups: 0
   });
   const [loading, setLoading] = useState(true);
 
@@ -57,56 +62,94 @@ const MainDashboard = () => {
     }
   }, [token]);
 
-  const handleLogout = async () => {
-    try {
-      const res = await fetch("http://localhost:5000/api/user/logout", {
-        method: "POST", // assuming logout is POST; change to GET if needed
-        credentials: "include", // important if you're using httpOnly cookies
-      });
+  // NEW FUNCTION: Fetch duplicate statistics
+  const fetchDuplicateStats = useCallback(async () => {
+    if (!token) return;
 
+    try {
+      console.log("Fetching duplicate stats...");
+      const res = await fetch("http://localhost:5000/api/driveFiles/duplicates/stats", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      
+      if (!res.ok) {
+        console.error("Duplicate stats fetch failed:", res.status, res.statusText);
+        return;
+      }
+
+      const data = await res.json();
+      console.log("Duplicate stats data:", data);
+      setDuplicateStats(data);
+    } catch (error) {
+      console.error("Failed to fetch duplicate stats:", error);
+    }
+  }, [token]);
+
+const handleLogout = async () => {
+    try {
+      console.log("🚪 Initiating logout...");
+      const res = await fetch("http://localhost:5000/api/user/logout", {
+        method: "POST",
+        headers: {
+          'Authorization': `Bearer ${token}`, 
+          'Content-Type': 'application/json'
+        },
+        credentials: "include",
+      });
+      const data = await res.json();
+      console.log("📤 Logout response:", data);
       if (res.ok) {
-        // Remove token from URL
         const url = new URL(window.location);
         url.searchParams.delete("token");
         window.history.replaceState({}, document.title, url.pathname);
 
-        // Redirect or reload
         window.location.reload();
       } else {
-        console.error("Logout failed:", await res.json());
+        console.error("Logout failed:", data);
       }
     } catch (err) {
       console.error("Logout error:", err.message);
     }
   };
 
-  const fetchUserStats = useCallback(async () => {
-    try {
-      setStats({
-        totalFiles: user?.drive_file_count ?? 0,
-        duplicates: 1203,
-        spaceSaved: "45.2 GB",
-        lastScan: user?.last_opened_at
-          ? formatDistanceToNow(new Date(user.last_opened_at), {
-              addSuffix: true,
-            })
-          : "Not available",
-      });
-    } catch (error) {
-      console.error("Failed to fetch user stats:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  
+
+const fetchUserStats = useCallback(async () => {
+  try {
+    setStats({
+      totalFiles: user?.drive_file_count ?? 0,
+      duplicates: duplicateStats.duplicateCount,
+      spaceSaved: duplicateStats.wastedSpaceFormatted,
+      lastScan: user?.last_opened_at
+        ? formatDistanceToNow(new Date(user.last_opened_at), {
+            addSuffix: true,
+          })
+        : "Not available",
+    });
+  } catch (error) {
+    console.error("Failed to fetch user stats:", error);
+  } finally {
+    setLoading(false);
+  }
+}, [user?.drive_file_count, user?.last_opened_at, duplicateStats]); // Added duplicateStats dependency
 
   useEffect(() => {
     if (token) {
       fetchUserProfile();
-      fetchUserStats();
+      fetchDuplicateStats(); // Fetch duplicate stats
     } else {
       setLoading(false);
     }
-  }, [token, fetchUserProfile, fetchUserStats]);
+  }, [token, fetchUserProfile, fetchDuplicateStats]);
+
+  // Update stats when duplicateStats or user changes
+  useEffect(() => {
+    if (user || duplicateStats.duplicateCount > 0) {
+      fetchUserStats();
+    }
+  }, [user, duplicateStats, fetchUserStats]);
 
   if (loading) {
     return (
@@ -192,7 +235,6 @@ const MainDashboard = () => {
     value,
     subtitle,
     color = "blue",
-    trend,
   }) => (
     <div
       className={`bg-gradient-to-br from-${color}-50 to-${color}-100 rounded-2xl p-6 border border-${color}-200 hover:shadow-lg transition-all duration-200 cursor-pointer group`}
@@ -203,12 +245,7 @@ const MainDashboard = () => {
         >
           <Icon size={24} className="text-white" />
         </div>
-        {trend && (
-          <div className={`flex items-center space-x-1 text-${color}-600`}>
-            <TrendingUp size={16} />
-            <span className="text-sm font-medium">{trend}</span>
-          </div>
-        )}
+
       </div>
       <h3 className="text-2xl font-bold text-gray-900 mb-1">{value}</h3>
       <p className="text-gray-600 text-sm font-medium">{title}</p>
@@ -407,25 +444,22 @@ const MainDashboard = () => {
                     icon={File}
                     title="Total Drive Files Scanned"
                     value={stats.totalFiles.toLocaleString()}
-                    subtitle="+234 this week"
+                    subtitle="Status: Up to Date"
                     color="blue"
-                    trend="+12%"
                   />
                   <StatCard
                     icon={AlertTriangle}
                     title="Duplicates Found"
                     value={stats.duplicates.toString()}
-                    subtitle="23.4 GB wasted space"
+                    subtitle={`${duplicateStats.wastedSpaceFormatted} wasted space`}
                     color="yellow"
-                    trend="-8%"
                   />
                   <StatCard
                     icon={HardDrive}
-                    title="Space Saved"
-                    value={stats.spaceSaved}
-                    subtitle="Last 30 days"
+                    title="Space That Can Be Saved"
+                    value={duplicateStats.wastedSpaceFormatted}
+                    subtitle={`${duplicateStats.duplicateGroups} duplicate groups`}
                     color="green"
-                    trend="+23%"
                   />
                   <StatCard
                     icon={Clock}
@@ -442,6 +476,7 @@ const MainDashboard = () => {
                     <h3 className="text-xl font-semibold text-gray-900">
                       Quick Analysis
                     </h3>
+
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <QuickActionCard
@@ -653,7 +688,7 @@ const MainDashboard = () => {
                             Drive optimization available
                           </p>
                           <p className="text-xs text-blue-700">
-                            45 duplicate files detected
+                            {duplicateStats.duplicateCount} duplicate files detected
                           </p>
                         </div>
                       </div>
