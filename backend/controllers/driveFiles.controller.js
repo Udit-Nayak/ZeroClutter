@@ -206,7 +206,6 @@ const listDriveFiles = async (req, res) => {
   }
 };
 
-// NEW FUNCTION: Get duplicate statistics
 const getDuplicateStats = async (req, res) => {
   try {
     const user = req.user;
@@ -248,6 +247,10 @@ const getDuplicateStats = async (req, res) => {
       return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
     };
 
+    // Only insert activity log if there are actually duplicates found
+    // This should be called when duplicates are actually DELETED, not just when stats are fetched
+    // Remove this from here and add it to a separate delete duplicates endpoint
+
     res.json({
       duplicateCount: totalDuplicates,
       wastedSpace: totalWastedSpace,
@@ -260,6 +263,44 @@ const getDuplicateStats = async (req, res) => {
     res.status(500).json({ error: "Failed to fetch duplicate statistics" });
   }
 };
+
+
+const getRecentActivities = async (req, res) => {
+  try {
+    const user = req.user;
+    if (!user) return res.status(401).json({ error: "Not authorized" });
+
+    const result = await pool.query(
+      `SELECT action, type, saved_bytes, created_at
+       FROM activity_logs
+       WHERE user_id = $1
+       ORDER BY created_at DESC
+       LIMIT 10`,
+      [user.id]
+    );
+
+    const formatBytes = (bytes) => {
+      if (bytes === 0) return '0 B';
+      const k = 1024;
+      const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    };
+
+    const activities = result.rows.map((row) => ({
+      action: row.action,
+      type: row.type,
+      size: formatBytes(row.saved_bytes),
+      time: row.created_at,
+    }));
+
+    res.json({ activities });
+  } catch (err) {
+    console.error("❌ Error fetching activity logs:", err);
+    res.status(500).json({ error: "Failed to fetch activity logs" });
+  }
+};
+
 
 const emptyTrash = async (req, res) => {
   try {
@@ -306,5 +347,6 @@ module.exports = {
   listDriveFiles,
   emptyTrash,
   rescanDriveFiles,
-  getDuplicateStats, // Export the new function
+  getDuplicateStats, 
+  getRecentActivities,// Export the new function
 };

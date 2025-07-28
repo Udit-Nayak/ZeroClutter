@@ -21,6 +21,7 @@ import LocalDashboard from "./Local/LocalDashboard";
 const MainDashboard = () => {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [user, setUser] = useState(null);
+  const [recentActivities, setRecentActivities] = useState([]);
   const [stats, setStats] = useState({
     totalFiles: 0,
     duplicates: 0,
@@ -28,11 +29,16 @@ const MainDashboard = () => {
     lastScan: null,
   });
   const [isRescanning, setIsRescanning] = useState(false);
+  const [promotionalStats, setPromotionalStats] = useState({
+    count: 0,
+    totalSize: 0,
+    formattedSize: "0 B",
+  });
   const [duplicateStats, setDuplicateStats] = useState({
     duplicateCount: 0,
     wastedSpace: 0,
     wastedSpaceFormatted: "0 B",
-    duplicateGroups: 0
+    duplicateGroups: 0,
   });
   const [loading, setLoading] = useState(true);
 
@@ -68,14 +74,21 @@ const MainDashboard = () => {
 
     try {
       console.log("Fetching duplicate stats...");
-      const res = await fetch("http://localhost:5000/api/driveFiles/duplicates/stats", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      
+      const res = await fetch(
+        "http://localhost:5000/api/driveFiles/duplicates/stats",
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
       if (!res.ok) {
-        console.error("Duplicate stats fetch failed:", res.status, res.statusText);
+        console.error(
+          "Duplicate stats fetch failed:",
+          res.status,
+          res.statusText
+        );
         return;
       }
 
@@ -86,48 +99,112 @@ const MainDashboard = () => {
       console.error("Failed to fetch duplicate stats:", error);
     }
   }, [token]);
+
+  const fetchPromotionalStats = useCallback(async () => {
+    if (!token) return;
+    try {
+      const res = await fetch("http://localhost:5000/api/gmail/promotions", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!res.ok) throw new Error("Failed to fetch promotional emails");
+
+      const data = await res.json();
+
+      // Calculate total size (approximate 50KB per promotional email)
+      const approximateSize = data.length * 50 * 1024; // 50KB per email
+
+      const formatBytes = (bytes) => {
+        if (bytes === 0) return "0 B";
+        const k = 1024;
+        const sizes = ["B", "KB", "MB", "GB", "TB"];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+      };
+
+      setPromotionalStats({
+        count: data.length,
+        totalSize: approximateSize,
+        formattedSize: formatBytes(approximateSize),
+      });
+    } catch (err) {
+      console.error("Error fetching promotional stats:", err);
+    }
+  }, [token]);
+
+  const fetchRecentActivities = useCallback(async () => {
+    if (!token) return;
+    try {
+      const res = await fetch("http://localhost:5000/api/activity/recent", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!res.ok) throw new Error("Failed to fetch activity logs");
+
+      const data = await res.json();
+      setRecentActivities(data.activities);
+    } catch (err) {
+      console.error("Error fetching activity logs:", err);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    if (token) {
+      fetchRecentActivities();
+      fetchPromotionalStats();
+    }
+  }, [token, fetchRecentActivities, fetchPromotionalStats]);
   // NEW FUNCTION: Handle Drive Rescan
-const handleRescanDriveFiles = async () => {
-  if (!token) return;
+  const handleRescanDriveFiles = async () => {
+    if (!token) return;
 
-  try {
-    setIsRescanning(true);
-    console.log("Starting drive rescan...");
-    
-    const response = await fetch("http://localhost:5000/api/driveFiles/rescan", {
-      method: "POST",
-      headers: { 
-        "Authorization": `Bearer ${token}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({})
-    });
-    
-    if (!response.ok) throw new Error("Failed to rescan drive");
-    
-    // Refresh user profile and duplicate stats after rescan
-    await Promise.all([
-      fetchUserProfile(),
-      fetchDuplicateStats()
-    ]);
-    
-    alert("Drive rescan completed and files updated!");
-  } catch (err) {
-    console.error("Failed to rescan drive:", err);
-    alert("Failed to rescan drive. Please try again.");
-  } finally {
-    setIsRescanning(false);
-  }
-};
+    try {
+      setIsRescanning(true);
+      console.log("Starting drive rescan...");
 
-const handleLogout = async () => {
+      const response = await fetch(
+        "http://localhost:5000/api/driveFiles/rescan",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({}),
+        }
+      );
+
+      if (!response.ok) throw new Error("Failed to rescan drive");
+
+      // Refresh user profile and duplicate stats after rescan
+      await Promise.all([
+        fetchUserProfile(),
+        fetchDuplicateStats(),
+        fetchRecentActivities(),
+        fetchPromotionalStats(),
+      ]);
+
+      alert("Drive rescan completed and files updated!");
+    } catch (err) {
+      console.error("Failed to rescan drive:", err);
+      alert("Failed to rescan drive. Please try again.");
+    } finally {
+      setIsRescanning(false);
+    }
+  };
+
+  const handleLogout = async () => {
     try {
       console.log("🚪 Initiating logout...");
       const res = await fetch("http://localhost:5000/api/user/logout", {
         method: "POST",
         headers: {
-          'Authorization': `Bearer ${token}`, 
-          'Content-Type': 'application/json'
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
         },
         credentials: "include",
       });
@@ -147,26 +224,24 @@ const handleLogout = async () => {
     }
   };
 
-  
-
-const fetchUserStats = useCallback(async () => {
-  try {
-    setStats({
-      totalFiles: user?.drive_file_count ?? 0,
-      duplicates: duplicateStats.duplicateCount,
-      spaceSaved: duplicateStats.wastedSpaceFormatted,
-      lastScan: user?.last_opened_at
-        ? formatDistanceToNow(new Date(user.last_opened_at), {
-            addSuffix: true,
-          })
-        : "Not available",
-    });
-  } catch (error) {
-    console.error("Failed to fetch user stats:", error);
-  } finally {
-    setLoading(false);
-  }
-}, [user?.drive_file_count, user?.last_opened_at, duplicateStats]); // Added duplicateStats dependency
+  const fetchUserStats = useCallback(async () => {
+    try {
+      setStats({
+        totalFiles: user?.drive_file_count ?? 0,
+        duplicates: duplicateStats.duplicateCount,
+        spaceSaved: duplicateStats.wastedSpaceFormatted,
+        lastScan: user?.last_opened_at
+          ? formatDistanceToNow(new Date(user.last_opened_at), {
+              addSuffix: true,
+            })
+          : "Not available",
+      });
+    } catch (error) {
+      console.error("Failed to fetch user stats:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.drive_file_count, user?.last_opened_at, duplicateStats]); // Added duplicateStats dependency
 
   useEffect(() => {
     if (token) {
@@ -262,13 +337,7 @@ const fetchUserStats = useCallback(async () => {
     </button>
   );
 
-  const StatCard = ({
-    icon: Icon,
-    title,
-    value,
-    subtitle,
-    color = "blue",
-  }) => (
+  const StatCard = ({ icon: Icon, title, value, subtitle, color = "blue" }) => (
     <div
       className={`bg-gradient-to-br from-${color}-50 to-${color}-100 rounded-2xl p-6 border border-${color}-200 hover:shadow-lg transition-all duration-200 cursor-pointer group`}
     >
@@ -278,7 +347,6 @@ const fetchUserStats = useCallback(async () => {
         >
           <Icon size={24} className="text-white" />
         </div>
-
       </div>
       <h3 className="text-2xl font-bold text-gray-900 mb-1">{value}</h3>
       <p className="text-gray-600 text-sm font-medium">{title}</p>
@@ -503,7 +571,6 @@ const fetchUserStats = useCallback(async () => {
                     <h3 className="text-xl font-semibold text-gray-900">
                       Quick Analysis
                     </h3>
-
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <QuickActionCard
@@ -541,36 +608,64 @@ const fetchUserStats = useCallback(async () => {
                     </h3>
                   </div>
                   <div className="space-y-4">
-                    {[
-                      {
-                        action: "Deleted 45 duplicate photos from Drive",
-                        time: "2 hours ago",
-                        type: "drive",
-                        size: "2.3 GB",
-                        impact: "high",
-                      },
-                      {
-                        action: "Cleaned 127 promotional emails",
-                        time: "1 day ago",
-                        type: "gmail",
-                        size: "156 MB",
-                        impact: "medium",
-                      },
-                      {
-                        action: "Scanned Downloads folder",
-                        time: "3 days ago",
-                        type: "local",
-                        size: "4.1 GB",
-                        impact: "high",
-                      },
-                      {
-                        action: "Optimized inbox organization",
-                        time: "1 week ago",
-                        type: "gmail",
-                        size: "89 MB",
-                        impact: "low",
-                      },
-                    ].map((activity, index) => (
+                    {/* First card - Dynamic duplicate data from dashboard stats */}
+                    {duplicateStats.duplicateCount > 0 && (
+                      <div className="flex items-center space-x-4 p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors duration-200 cursor-pointer group">
+                        <div className="p-3 bg-blue-100 text-blue-600 rounded-xl shadow-sm group-hover:scale-105 transition-transform duration-200">
+                          <HardDrive size={18} />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-gray-900 group-hover:text-gray-700">
+                            Found {duplicateStats.duplicateCount} duplicate
+                            files in Drive
+                          </p>
+                          <div className="flex items-center space-x-2 mt-1">
+                            <p className="text-xs text-gray-500">
+                              {stats.lastScan}
+                            </p>
+                            <span className="text-xs text-gray-400">•</span>
+                            <p className="text-xs font-medium text-green-600">
+                              Can save {duplicateStats.wastedSpaceFormatted}
+                            </p>
+                          </div>
+                        </div>
+                        <CheckCircle2
+                          size={16}
+                          className="text-green-500 group-hover:scale-110 transition-transform duration-200"
+                        />
+                      </div>
+                    )}
+
+                    {/* Second card - Promotional emails */}
+                    {promotionalStats.count > 0 && (
+                      <div className="flex items-center space-x-4 p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors duration-200 cursor-pointer group">
+                        <div className="p-3 bg-red-100 text-red-600 rounded-xl shadow-sm group-hover:scale-105 transition-transform duration-200">
+                          <Mail size={18} />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-gray-900 group-hover:text-gray-700">
+                            Detected {promotionalStats.count} promotional emails
+                            in Gmail
+                          </p>
+                          <div className="flex items-center space-x-2 mt-1">
+                            <p className="text-xs text-gray-500">
+                              {stats.lastScan}
+                            </p>
+                            <span className="text-xs text-gray-400">•</span>
+                            <p className="text-xs font-medium text-green-600">
+                              Can save {promotionalStats.formattedSize}
+                            </p>
+                          </div>
+                        </div>
+                        <CheckCircle2
+                          size={16}
+                          className="text-green-500 group-hover:scale-110 transition-transform duration-200"
+                        />
+                      </div>
+                    )}
+
+                    {/* Rest of the activities from API */}
+                    {recentActivities.map((activity, index) => (
                       <div
                         key={index}
                         className="flex items-center space-x-4 p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors duration-200 cursor-pointer group"
@@ -598,24 +693,14 @@ const fetchUserStats = useCallback(async () => {
                           </p>
                           <div className="flex items-center space-x-2 mt-1">
                             <p className="text-xs text-gray-500">
-                              {activity.time}
+                              {formatDistanceToNow(new Date(activity.time), {
+                                addSuffix: true,
+                              })}
                             </p>
                             <span className="text-xs text-gray-400">•</span>
                             <p className="text-xs font-medium text-green-600">
                               Saved {activity.size}
                             </p>
-                            <span className="text-xs text-gray-400">•</span>
-                            <span
-                              className={`text-xs px-2 py-0.5 rounded-full ${
-                                activity.impact === "high"
-                                  ? "bg-green-100 text-green-700"
-                                  : activity.impact === "medium"
-                                  ? "bg-yellow-100 text-yellow-700"
-                                  : "bg-gray-100 text-gray-600"
-                              }`}
-                            >
-                              {activity.impact} impact
-                            </span>
                           </div>
                         </div>
                         <CheckCircle2
@@ -715,7 +800,8 @@ const fetchUserStats = useCallback(async () => {
                             Drive optimization available
                           </p>
                           <p className="text-xs text-blue-700">
-                            {duplicateStats.duplicateCount} duplicate files detected
+                            {duplicateStats.duplicateCount} duplicate files
+                            detected
                           </p>
                         </div>
                       </div>
@@ -767,22 +853,24 @@ const fetchUserStats = useCallback(async () => {
                     </p>
                   </div>
                   <div className="flex items-center space-x-3">
-  <button 
-    onClick={handleRescanDriveFiles}
-    disabled={isRescanning}
-    className={`p-2 rounded-xl transition-colors duration-200 ${
-      isRescanning 
-        ? 'text-gray-400 cursor-not-allowed' 
-        : 'text-gray-400 hover:text-blue-600 hover:bg-blue-100'
-    }`}
-    title={isRescanning ? "Rescanning..." : "Rescan Google Drive"}
-  >
-    <RefreshCw 
-      size={20} 
-      className={isRescanning ? 'animate-spin' : ''} 
-    />
-  </button>
-</div>
+                    <button
+                      onClick={handleRescanDriveFiles}
+                      disabled={isRescanning}
+                      className={`p-2 rounded-xl transition-colors duration-200 ${
+                        isRescanning
+                          ? "text-gray-400 cursor-not-allowed"
+                          : "text-gray-400 hover:text-blue-600 hover:bg-blue-100"
+                      }`}
+                      title={
+                        isRescanning ? "Rescanning..." : "Rescan Google Drive"
+                      }
+                    >
+                      <RefreshCw
+                        size={20}
+                        className={isRescanning ? "animate-spin" : ""}
+                      />
+                    </button>
+                  </div>
                 </div>
 
                 <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
