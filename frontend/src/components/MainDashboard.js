@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
-  Search,
   Mail,
   HardDrive,
   File,
@@ -20,6 +19,7 @@ import { formatDistanceToNow } from "date-fns";
 import DriveDashboard from "./Drive/DriveDashboard";
 import GmailDashboard from "./Gmail/GmailDashboard";
 import LocalDashboard from "./Local/LocalDashboard";
+import logo from "../assets/logo.png";
 
 const MainDashboard = () => {
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -785,9 +785,7 @@ const MainDashboard = () => {
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-3">
-                <div className="p-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl shadow-sm">
-                  <Search size={20} className="text-white" />
-                </div>
+                <img src={logo} alt="ZeroClutter Logo" width={64} height={64} />
                 <div>
                   <h1 className="text-xl font-bold text-gray-900">
                     ZeroClutter{" "}

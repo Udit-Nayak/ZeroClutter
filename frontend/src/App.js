@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Search, File, Mail, HardDrive, BarChart3, Trash2, Settings, CheckCircle2, Shield, Zap, TrendingUp, AlertTriangle, Clock, RefreshCw, Eye, Filter } from 'lucide-react';
+import { File, Mail, HardDrive, BarChart3, Trash2, Settings, CheckCircle2, Shield, Zap, TrendingUp, AlertTriangle, Clock, RefreshCw, Eye, Filter } from 'lucide-react';
 import DriveDashboard from './components/Drive/DriveDashboard';
 import GmailDashboard from './components/Gmail/GmailDashboard';
 import LocalDashboard from './components/Local/LocalDashboard';
+import logo from "./assets/logo.png";
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [user, setUser] = useState(null);
+  const [user] = useState(null);
   const [stats] = useState({
     totalFiles: 0,
     duplicates: 0,
@@ -100,8 +101,8 @@ function App() {
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4">
         <div className="max-w-md w-full">
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-r from-blue-500 to-purple-600 rounded-3xl mb-6 shadow-xl">
-              <Search size={32} className="text-white" />
+            <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl">
+                <img src={logo} alt="ZeroClutter Logo" width={80} height={80} />
             </div>
             <h1 className="text-4xl font-bold text-gray-900 mb-3">ZeroClutter</h1>
             <p className="text-gray-600 text-lg">Intelligent duplicate detection across all your digital spaces</p>
@@ -154,9 +155,9 @@ function App() {
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-3">
-                <div className="p-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl shadow-sm">
-                  <Search size={20} className="text-white" />
-                </div>
+            <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl mb-6">
+                <img src={logo} alt="ZeroClutter Logo" width={64} height={64} />
+            </div>
                 <div>
                   <h1 className="text-xl font-bold text-gray-900">ZeroClutter</h1>
                   <p className="text-xs text-gray-500">Smart Duplicate Detection</p>

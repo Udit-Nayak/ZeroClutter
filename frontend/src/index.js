@@ -79,18 +79,6 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-// Loading component
-const LoadingSpinner = () => (
-  <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-    <div className="text-center">
-      <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl mb-4">
-        <div className="loading-spinner border-white"></div>
-      </div>
-      <h2 className="text-lg font-medium text-gray-900 mb-2">Loading ZeroClutter</h2>
-      <p className="text-gray-600">Please wait while we set up your dashboard...</p>
-    </div>
-  </div>
-);
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
