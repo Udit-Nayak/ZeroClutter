@@ -14,6 +14,7 @@ import {
   LogOut,
   ChevronDown,
   ChevronUp,
+  FolderOpen,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import DriveDashboard from "./Drive/DriveDashboard";
@@ -31,34 +32,34 @@ const MainDashboard = () => {
     lastScan: null,
   });
   const [storageData, setStorageData] = useState({
-  total: {
-    used: 0,
-    limit: 0,
-    percentage: 0,
-    formattedUsed: "0 B",
-    formattedLimit: "0 B"
-  },
-  gmail: {
-    used: 0,
-    percentage: 0,
-    formattedUsed: "0 B"
-  },
-  drive: {
-    used: 0,
-    percentage: 0,
-    formattedUsed: "0 B"
-  },
-  photos: {
-    used: 0,
-    percentage: 0,
-    formattedUsed: "0 B"
-  },
-  trash: {
-    used: 0,
-    percentage: 0,
-    formattedUsed: "0 B"
-  }
-});
+    total: {
+      used: 0,
+      limit: 0,
+      percentage: 0,
+      formattedUsed: "0 B",
+      formattedLimit: "0 B",
+    },
+    gmail: {
+      used: 0,
+      percentage: 0,
+      formattedUsed: "0 B",
+    },
+    drive: {
+      used: 0,
+      percentage: 0,
+      formattedUsed: "0 B",
+    },
+    photos: {
+      used: 0,
+      percentage: 0,
+      formattedUsed: "0 B",
+    },
+    trash: {
+      used: 0,
+      percentage: 0,
+      formattedUsed: "0 B",
+    },
+  });
   const [showUsageDetails, setShowUsageDetails] = useState(false);
 
   const [spamStats, setSpamStats] = useState({
@@ -96,41 +97,45 @@ const MainDashboard = () => {
   };
 
   const fetchStorageQuota = useCallback(async () => {
-  if (!token) return;
+    if (!token) return;
 
-  try {
-    console.log("Fetching storage quota...");
-    const res = await fetch("http://localhost:5000/api/user/storage-quota", {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
+    try {
+      console.log("Fetching storage quota...");
+      const res = await fetch("http://localhost:5000/api/user/storage-quota", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
-    if (!res.ok) {
-      console.error("Storage quota fetch failed:", res.status, res.statusText);
-      const errorData = await res.json();
-      
-      // Use fallback data if API fails but still has fallback data
-      if (errorData.data) {
-        console.log("Using fallback storage data");
-        setStorageData(errorData.data);
+      if (!res.ok) {
+        console.error(
+          "Storage quota fetch failed:",
+          res.status,
+          res.statusText
+        );
+        const errorData = await res.json();
+
+        // Use fallback data if API fails but still has fallback data
+        if (errorData.data) {
+          console.log("Using fallback storage data");
+          setStorageData(errorData.data);
+        }
+        return;
       }
-      return;
-    }
 
-    const data = await res.json();
-    console.log("Storage quota data received:", data);
-    
-    // Validate data structure before setting
-    if (data && data.total && typeof data.total.percentage === 'number') {
-      setStorageData(data);
-    } else {
-      console.warn("Invalid storage data structure received:", data);
+      const data = await res.json();
+      console.log("Storage quota data received:", data);
+
+      // Validate data structure before setting
+      if (data && data.total && typeof data.total.percentage === "number") {
+        setStorageData(data);
+      } else {
+        console.warn("Invalid storage data structure received:", data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch storage quota:", error);
     }
-  } catch (error) {
-    console.error("Failed to fetch storage quota:", error);
-  }
-}, [token]);
+  }, [token]);
 
   const fetchUserProfile = useCallback(async () => {
     if (!token) return;
@@ -292,205 +297,224 @@ const MainDashboard = () => {
   }, [token]);
 
   const StorageHealthCard = () => {
-  const getStorageColor = (percentage) => {
-    if (percentage >= 90) return 'red';
-    if (percentage >= 75) return 'yellow';
-    return 'blue';
-  };
+    const getStorageColor = (percentage) => {
+      if (percentage >= 90) return "red";
+      if (percentage >= 75) return "yellow";
+      return "blue";
+    };
 
-  const storageColor = getStorageColor(storageData.total.percentage);
+    const storageColor = getStorageColor(storageData.total.percentage);
 
-  return (
-    <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
-      <div className="text-center mb-6">
-        <h2 className="text-2xl font-semibold text-gray-900 mb-2">
-          Storage {storageData.total.percentage}% full
-        </h2>
-        <p className="text-gray-600 text-sm">
-          Your storage is shared across Google Photos, Drive, Gmail and more
-        </p>
-      </div>
-
-      {/* Main Storage Bar */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-sm font-medium text-gray-700">Storage used</span>
-          <span className="text-sm font-medium text-gray-900">
-            {storageData.total.formattedUsed} of {storageData.total.formattedLimit}
-          </span>
+    return (
+      <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
+        <div className="text-center mb-6">
+          <h2 className="text-2xl font-semibold text-gray-900 mb-2">
+            Storage {storageData.total.percentage}% full
+          </h2>
+          <p className="text-gray-600 text-sm">
+            Your storage is shared across Google Photos, Drive, Gmail and more
+          </p>
         </div>
-        
-        {/* Multi-segment progress bar */}
-        <div className="w-full bg-gray-200 rounded-full h-4 mb-4 overflow-hidden relative">
-          <div className="h-full flex">
-            {/* Google Photos segment - Yellow/Orange */}
-            <div 
-              className="bg-yellow-500 h-full transition-all duration-300"
-              style={{ 
-                width: `${Math.min(storageData.photos.percentage, 100)}%` 
-              }}
-              title={`Google Photos: ${storageData.photos.formattedUsed}`}
-            />
-            {/* Google Drive segment - Blue */}
-            <div 
-              className="bg-blue-500 h-full transition-all duration-300"
-              style={{ 
-                width: `${Math.min(storageData.drive.percentage, 100)}%` 
-              }}
-              title={`Google Drive: ${storageData.drive.formattedUsed}`}
-            />
-            {/* Gmail segment - Red */}
-            <div 
-              className="bg-red-500 h-full transition-all duration-300"
-              style={{ 
-                width: `${Math.min(storageData.gmail.percentage, 100)}%` 
-              }}
-              title={`Gmail: ${storageData.gmail.formattedUsed}`}
-            />
-          </div>
-        </div>
-      </div>
 
-      {/* Usage Details Toggle */}
-      <button
-        onClick={() => setShowUsageDetails(!showUsageDetails)}
-        className="flex items-center justify-center w-full py-3 text-sm text-gray-600 hover:text-gray-800 transition-colors duration-200 rounded-lg hover:bg-gray-50"
-      >
-        <span className="mr-2 font-medium">Usage details</span>
-        {showUsageDetails ? (
-          <ChevronUp size={16} className="transition-transform duration-200" />
-        ) : (
-          <ChevronDown size={16} className="transition-transform duration-200" />
-        )}
-      </button>
-
-      {/* Detailed Usage Breakdown */}
-      {showUsageDetails && (
-        <div className="mt-4 pt-4 border-t border-gray-200 space-y-4">
-          {/* Google Photos */}
-          <div className="flex items-center justify-between py-2">
-            <div className="flex items-center space-x-3">
-              <div className="w-4 h-4 bg-yellow-500 rounded-full shadow-sm"></div>
-              <div className="flex flex-col">
-                <span className="text-sm font-medium text-gray-900">Google Photos</span>
-                <span className="text-xs text-gray-500">
-                  {storageData.photos.percentage}% of total storage
-                </span>
-              </div>
-            </div>
-            <div className="text-right">
-              <span className="text-sm font-semibold text-gray-900">
-                {storageData.photos.formattedUsed}
-              </span>
-            </div>
+        {/* Main Storage Bar */}
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm font-medium text-gray-700">
+              Storage used
+            </span>
+            <span className="text-sm font-medium text-gray-900">
+              {storageData.total.formattedUsed} of{" "}
+              {storageData.total.formattedLimit}
+            </span>
           </div>
 
-          {/* Google Drive */}
-          <div className="flex items-center justify-between py-2">
-            <div className="flex items-center space-x-3">
-              <div className="w-4 h-4 bg-blue-500 rounded-full shadow-sm"></div>
-              <div className="flex flex-col">
-                <span className="text-sm font-medium text-gray-900">Google Drive</span>
-                <span className="text-xs text-gray-500">
-                  {storageData.drive.percentage}% of total storage
-                </span>
-              </div>
+          {/* Multi-segment progress bar */}
+          <div className="w-full bg-gray-200 rounded-full h-4 mb-4 overflow-hidden relative">
+            <div className="h-full flex">
+              {/* Google Photos segment - Yellow/Orange */}
+              <div
+                className="bg-yellow-500 h-full transition-all duration-300"
+                style={{
+                  width: `${Math.min(storageData.photos.percentage, 100)}%`,
+                }}
+                title={`Google Photos: ${storageData.photos.formattedUsed}`}
+              />
+              {/* Google Drive segment - Blue */}
+              <div
+                className="bg-blue-500 h-full transition-all duration-300"
+                style={{
+                  width: `${Math.min(storageData.drive.percentage, 100)}%`,
+                }}
+                title={`Google Drive: ${storageData.drive.formattedUsed}`}
+              />
+              {/* Gmail segment - Red */}
+              <div
+                className="bg-red-500 h-full transition-all duration-300"
+                style={{
+                  width: `${Math.min(storageData.gmail.percentage, 100)}%`,
+                }}
+                title={`Gmail: ${storageData.gmail.formattedUsed}`}
+              />
             </div>
-            <div className="text-right">
-              <span className="text-sm font-semibold text-gray-900">
-                {storageData.drive.formattedUsed}
-              </span>
-            </div>
-          </div>
-
-          {/* Gmail */}
-          <div className="flex items-center justify-between py-2">
-            <div className="flex items-center space-x-3">
-              <div className="w-4 h-4 bg-red-500 rounded-full shadow-sm"></div>
-              <div className="flex flex-col">
-                <span className="text-sm font-medium text-gray-900">Gmail</span>
-                <span className="text-xs text-gray-500">
-                  {storageData.gmail.percentage}% of total storage
-                </span>
-              </div>
-            </div>
-            <div className="text-right">
-              <span className="text-sm font-semibold text-gray-900">
-                {storageData.gmail.formattedUsed}
-              </span>
-            </div>
-          </div>
-
-          {/* Storage Status Indicator */}
-          <div className={`mt-4 p-3 rounded-lg border-l-4 ${
-            storageColor === 'red' 
-              ? 'bg-red-50 border-red-400' 
-              : storageColor === 'yellow'
-              ? 'bg-yellow-50 border-yellow-400'
-              : 'bg-blue-50 border-blue-400'
-          }`}>
-            <p className={`text-sm font-medium ${
-              storageColor === 'red' 
-                ? 'text-red-800' 
-                : storageColor === 'yellow'
-                ? 'text-yellow-800'
-                : 'text-blue-800'
-            }`}>
-              {storageColor === 'red' 
-                ? '⚠️ Storage almost full' 
-                : storageColor === 'yellow'
-                ? '💾 Storage filling up'
-                : '✅ Storage healthy'
-              }
-            </p>
-            <p className={`text-xs mt-1 ${
-              storageColor === 'red' 
-                ? 'text-red-600' 
-                : storageColor === 'yellow'
-                ? 'text-yellow-600'
-                : 'text-blue-600'
-            }`}>
-              {storageColor === 'red' 
-                ? 'Consider cleaning up files or upgrading storage' 
-                : storageColor === 'yellow'
-                ? 'You may want to review and clean up files'
-                : 'Your storage usage looks good'
-              }
-            </p>
           </div>
         </div>
-      )}
 
-      {/* Action Buttons */}
-      <div className="mt-6 pt-4 border-t border-gray-200 space-y-3">
+        {/* Usage Details Toggle */}
         <button
-          onClick={fetchStorageQuota}
-          className="flex items-center justify-center w-full py-3 px-4 text-sm text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-all duration-200 font-medium border border-blue-200 hover:border-blue-300"
+          onClick={() => setShowUsageDetails(!showUsageDetails)}
+          className="flex items-center justify-center w-full py-3 text-sm text-gray-600 hover:text-gray-800 transition-colors duration-200 rounded-lg hover:bg-gray-50"
         >
-          <RefreshCw size={16} className="mr-2" />
-          Refresh Storage Data
+          <span className="mr-2 font-medium">Usage details</span>
+          {showUsageDetails ? (
+            <ChevronUp
+              size={16}
+              className="transition-transform duration-200"
+            />
+          ) : (
+            <ChevronDown
+              size={16}
+              className="transition-transform duration-200"
+            />
+          )}
         </button>
-        
-        {storageData.total.percentage > 75 && (
-          <button
-            onClick={() => {
-              // Navigate to cleanup sections
-              setActiveTab('gmail');
-            }}
-            className={`flex items-center justify-center w-full py-3 px-4 text-sm text-white rounded-lg transition-all duration-200 font-medium shadow-sm hover:shadow-md ${
-              storageColor === 'red'
-                ? 'bg-red-500 hover:bg-red-600'
-                : 'bg-yellow-500 hover:bg-yellow-600'
-            }`}
-          >
-            <AlertTriangle size={16} className="mr-2" />
-            Free Up Space
-          </button>
+
+        {/* Detailed Usage Breakdown */}
+        {showUsageDetails && (
+          <div className="mt-4 pt-4 border-t border-gray-200 space-y-4">
+            {/* Google Photos */}
+            <div className="flex items-center justify-between py-2">
+              <div className="flex items-center space-x-3">
+                <div className="w-4 h-4 bg-yellow-500 rounded-full shadow-sm"></div>
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium text-gray-900">
+                    Google Photos
+                  </span>
+                  <span className="text-xs text-gray-500">
+                    {storageData.photos.percentage}% of total storage
+                  </span>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="text-sm font-semibold text-gray-900">
+                  {storageData.photos.formattedUsed}
+                </span>
+              </div>
+            </div>
+
+            {/* Google Drive */}
+            <div className="flex items-center justify-between py-2">
+              <div className="flex items-center space-x-3">
+                <div className="w-4 h-4 bg-blue-500 rounded-full shadow-sm"></div>
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium text-gray-900">
+                    Google Drive
+                  </span>
+                  <span className="text-xs text-gray-500">
+                    {storageData.drive.percentage}% of total storage
+                  </span>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="text-sm font-semibold text-gray-900">
+                  {storageData.drive.formattedUsed}
+                </span>
+              </div>
+            </div>
+
+            {/* Gmail */}
+            <div className="flex items-center justify-between py-2">
+              <div className="flex items-center space-x-3">
+                <div className="w-4 h-4 bg-red-500 rounded-full shadow-sm"></div>
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium text-gray-900">
+                    Gmail
+                  </span>
+                  <span className="text-xs text-gray-500">
+                    {storageData.gmail.percentage}% of total storage
+                  </span>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="text-sm font-semibold text-gray-900">
+                  {storageData.gmail.formattedUsed}
+                </span>
+              </div>
+            </div>
+
+            {/* Storage Status Indicator */}
+            <div
+              className={`mt-4 p-3 rounded-lg border-l-4 ${
+                storageColor === "red"
+                  ? "bg-red-50 border-red-400"
+                  : storageColor === "yellow"
+                  ? "bg-yellow-50 border-yellow-400"
+                  : "bg-blue-50 border-blue-400"
+              }`}
+            >
+              <p
+                className={`text-sm font-medium ${
+                  storageColor === "red"
+                    ? "text-red-800"
+                    : storageColor === "yellow"
+                    ? "text-yellow-800"
+                    : "text-blue-800"
+                }`}
+              >
+                {storageColor === "red"
+                  ? "⚠️ Storage almost full"
+                  : storageColor === "yellow"
+                  ? "💾 Storage filling up"
+                  : "✅ Storage healthy"}
+              </p>
+              <p
+                className={`text-xs mt-1 ${
+                  storageColor === "red"
+                    ? "text-red-600"
+                    : storageColor === "yellow"
+                    ? "text-yellow-600"
+                    : "text-blue-600"
+                }`}
+              >
+                {storageColor === "red"
+                  ? "Consider cleaning up files or upgrading storage"
+                  : storageColor === "yellow"
+                  ? "You may want to review and clean up files"
+                  : "Your storage usage looks good"}
+              </p>
+            </div>
+          </div>
         )}
+
+        {/* Action Buttons */}
+        <div className="mt-6 pt-4 border-t border-gray-200 space-y-3">
+          <button
+            onClick={fetchStorageQuota}
+            className="flex items-center justify-center w-full py-3 px-4 text-sm text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-all duration-200 font-medium border border-blue-200 hover:border-blue-300"
+          >
+            <RefreshCw size={16} className="mr-2" />
+            Refresh Storage Data
+          </button>
+
+          {storageData.total.percentage > 75 && (
+            <button
+              onClick={() => {
+                // Navigate to cleanup sections
+                setActiveTab("gmail");
+              }}
+              className={`flex items-center justify-center w-full py-3 px-4 text-sm text-white rounded-lg transition-all duration-200 font-medium shadow-sm hover:shadow-md ${
+                storageColor === "red"
+                  ? "bg-red-500 hover:bg-red-600"
+                  : "bg-yellow-500 hover:bg-yellow-600"
+              }`}
+            >
+              <AlertTriangle size={16} className="mr-2" />
+              Free Up Space
+            </button>
+          )}
+        </div>
       </div>
-    </div>
-  );
-};
+    );
+  };
   useEffect(() => {
     if (token) {
       fetchRecentActivities();
@@ -1227,9 +1251,12 @@ const MainDashboard = () => {
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="text-3xl font-bold text-gray-900 mb-2">
-                      Gmail Analysis
-                    </h2>
+                    <div className="flex items-center gap-3 mb-2">
+                      <Mail size={30} />
+                      <h2 className="text-3xl font-bold text-gray-900">
+                        Gmail Analysis
+                      </h2>
+                    </div>
                     <p className="text-gray-600 text-lg">
                       Clean up your inbox and optimize email storage
                     </p>
@@ -1246,9 +1273,12 @@ const MainDashboard = () => {
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="text-3xl font-bold text-gray-900 mb-2">
-                      Google Drive
-                    </h2>
+                    <div className="flex items-center gap-3 mb-2">
+                      <FolderOpen size={30} />
+                      <h2 className="text-3xl font-bold text-gray-900 mb-2">
+                        Google Drive
+                      </h2>
+                    </div>
                     <p className="text-gray-600 text-lg">
                       Optimize your Google Drive storage and organization
                     </p>

@@ -245,12 +245,12 @@ function FilterPanel({ filters, onChange, onApply }) {
       }}>
         <div>
           <label style={{ 
-            display: "block", 
+            display: "flex", 
+            alignItems: "center",
             marginBottom: "0.5rem", 
             fontSize: "0.875rem", 
             fontWeight: "500",
             color: "#374151",
-            alignItems: "center",
             gap: "0.5rem"
           }}>
             <Search size={14} />Search by Name
@@ -290,7 +290,7 @@ function FilterPanel({ filters, onChange, onApply }) {
 
         <div>
           <label style={{ 
-            display: "block", 
+            display: "flex", 
             marginBottom: "0.5rem", 
             fontSize: "0.875rem", 
             fontWeight: "500",

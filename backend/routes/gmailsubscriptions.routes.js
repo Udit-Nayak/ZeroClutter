@@ -33,6 +33,6 @@ router.get("/promotions", protectRoute, getPromotionsEmails);
 router.post("/promotions/delete", protectRoute, deletePromotionsEmails);
 
 router.get('/old-unread', protectRoute, getOldUnreadEmails);
-router.delete('/old-unread', protectRoute, deleteOldUnreadEmails);
+router.post('/old-unread/delete', protectRoute, deleteOldUnreadEmails);
 
 module.exports = router;
