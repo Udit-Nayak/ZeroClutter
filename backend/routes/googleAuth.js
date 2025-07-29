@@ -6,6 +6,8 @@ const pool = require("../db");
 
 const router = express.Router();
 
+
+
 router.get("/login", (req, res) => {
   const oauth2Client = getOAuth2Client();
   const url = oauth2Client.generateAuthUrl({
@@ -32,35 +34,32 @@ router.get("/callback", async (req, res) => {
     console.log("🔐 Scopes granted by user:", tokens.scope);
 
     oauth2Client.setCredentials(tokens);
-    const oauth2 = google.oauth2({
-      auth: oauth2Client,
-      version: "v2",
-    });
+    const oauth2 = google.oauth2({ auth: oauth2Client, version: "v2" });
 
     const userInfo = await oauth2.userinfo.get();
     const { email, name, picture } = userInfo.data;
 
-    const result = await pool.query("SELECT * FROM users WHERE email = $1", [
-      email,
-    ]);
+    let result = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
 
+    let user;
     if (result.rowCount === 0) {
-      return res.status(404).send("User not found. Please sign up first.");
+      // User doesn't exist, so create one
+      const insertResult = await pool.query(
+        `INSERT INTO users (email, username, avatar, google_tokens) 
+         VALUES ($1, $2, $3, $4) RETURNING *`,
+        [email, name, picture, tokens]
+      );
+      user = insertResult.rows[0];
+      console.log("🆕 New user created via Google OAuth:", email);
+    } else {
+      // User already exists, update their tokens and profile info
+      user = result.rows[0];
+      await pool.query(
+        `UPDATE users SET google_tokens = $1, username = $2, avatar = $3 WHERE id = $4`,
+        [tokens, name, picture, user.id]
+      );
+      console.log("✅ Existing user logged in:", email);
     }
-
-    const user = result.rows[0];
-
-    await pool.query(
-      "UPDATE users SET google_tokens = $1, username = $2, avatar = $3 WHERE id = $4",
-      [tokens, name, picture, user.id]
-    );
-
-    const payload = {
-      userId: user.id,
-      name,
-      email,
-      picture,
-    };
 
     const accessToken = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, {
       expiresIn: "1d",
@@ -72,5 +71,6 @@ router.get("/callback", async (req, res) => {
     res.status(500).send("Google authentication failed.");
   }
 });
+
 
 module.exports = router;
