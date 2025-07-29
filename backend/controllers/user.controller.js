@@ -28,7 +28,6 @@ exports.register = async (req, res) => {
     res.status(500).json({ error: "User registration failed" });
   }
 };
-
 exports.login = async (req, res) => {
   const { email, password } = req.body;
   try {
@@ -54,12 +53,11 @@ exports.login = async (req, res) => {
     res.status(500).json({ error: "Login failed" });
   }
 };
-
 exports.logout = async (req, res) => {
   try {
     console.log("🚪 Logout endpoint hit!");
     console.log("📋 Headers received:", req.headers);
-    
+
     const authHeader = req.headers.authorization;
     let userId = null;
 
@@ -68,13 +66,16 @@ exports.logout = async (req, res) => {
     if (authHeader && authHeader.startsWith("Bearer ")) {
       const token = authHeader.split(" ")[1];
       console.log("🎫 Token extracted:", token.substring(0, 20) + "...");
-      
+
       try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
         userId = decoded.userId;
         console.log("✅ JWT decoded successfully, userId:", userId);
       } catch (jwtError) {
-        console.log("⚠️ JWT verification failed during logout:", jwtError.message);
+        console.log(
+          "⚠️ JWT verification failed during logout:",
+          jwtError.message
+        );
       }
     } else {
       console.log("❌ No valid Authorization header found");
@@ -83,36 +84,39 @@ exports.logout = async (req, res) => {
     // Update last_opened_at to current timestamp before logout
     if (userId) {
       console.log("🔄 Attempting to update last_opened_at for user:", userId);
-      
+
       const updateResult = await pool.query(
         "UPDATE users SET last_opened_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING last_opened_at",
         [userId]
       );
-      
+
       console.log("✅ Updated last_opened_at for user:", userId);
-      console.log("📅 New last_opened_at:", updateResult.rows[0]?.last_opened_at);
+      console.log(
+        "📅 New last_opened_at:",
+        updateResult.rows[0]?.last_opened_at
+      );
     } else {
       console.log("⚠️ No userId found, skipping database update");
     }
 
     clearToken(res);
-    
-    res.status(200).json({ 
+
+    res.status(200).json({
       message: "Logged out successfully",
       timestamp: new Date().toISOString(),
-      userId: userId // For debugging only - remove in production
+      userId: userId, // For debugging only - remove in production
     });
   } catch (err) {
     console.error("💥 Logout error:", err.message);
     console.error("📍 Error stack:", err.stack);
-    
+
     // Even if there's an error updating the database, still clear the token
     clearToken(res);
-    
-    res.status(200).json({ 
-      message: "Logged out successfully", 
+
+    res.status(200).json({
+      message: "Logged out successfully",
       warning: "Could not update last activity time",
-      error: err.message // For debugging only - remove in production
+      error: err.message, // For debugging only - remove in production
     });
   }
 };
@@ -179,5 +183,121 @@ exports.profile = async (req, res) => {
       return res.status(403).json({ error: "Invalid or expired token" });
     }
     res.status(500).json({ error: "Failed to retrieve profile" });
+  }
+};
+exports.getStorageQuota = async (req, res) => {
+  try {
+    const user = req.user;
+    
+    if (!user.google_tokens) {
+      return res.status(401).json({ message: "Google tokens not found" });
+    }
+
+    const { google } = require('googleapis');
+    const { getOAuth2Client } = require('../libs/googleOAuth');
+    
+    const oauth2Client = getOAuth2Client();
+    oauth2Client.setCredentials(user.google_tokens);
+
+    const formatBytes = (bytes) => {
+      if (!bytes || bytes === 0) return "0 B";
+      const k = 1024;
+      const sizes = ["B", "KB", "MB", "GB", "TB"];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+    };
+
+    const drive = google.drive({ version: 'v3', auth: oauth2Client });
+    const about = await drive.about.get({
+      fields: 'storageQuota,user'
+    });
+
+    const storageQuota = about.data.storageQuota;
+    console.log('Raw storage quota data:', storageQuota);
+    
+    const totalUsage = parseInt(storageQuota.usage) || 0;
+    const driveUsage = parseInt(storageQuota.usageInDrive) || 0;
+    const trashUsage = parseInt(storageQuota.usageInDriveTrash) || 0;
+    const limit = parseInt(storageQuota.limit) || 0;
+
+    let gmailUsage = parseInt(storageQuota.usageInGmail) || 0;
+    
+    if (gmailUsage === 0) {
+      try {
+        const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
+        const profile = await gmail.users.getProfile({ userId: 'me' });
+        const messagesRes = await gmail.users.messages.list({ 
+          userId: 'me', 
+          maxResults: 1 
+        });
+        
+        if (messagesRes.data.resultSizeEstimate) {
+          gmailUsage = messagesRes.data.resultSizeEstimate * 75 * 1024;
+        }
+      } catch (gmailError) {
+        console.log('Could not fetch Gmail usage:', gmailError.message);
+      }
+    }
+
+    const photosUsage = Math.max(0, totalUsage - driveUsage - gmailUsage - trashUsage);
+
+    console.log('Calculated usage breakdown:', {
+      total: totalUsage,
+      drive: driveUsage,
+      gmail: gmailUsage,
+      photos: photosUsage,
+      trash: trashUsage,
+      limit: limit
+    });
+
+    const storageData = {
+      total: {
+        used: totalUsage,
+        limit: limit,
+        percentage: limit > 0 ? Math.round((totalUsage / limit) * 100) : 0,
+        formattedUsed: formatBytes(totalUsage),
+        formattedLimit: formatBytes(limit)
+      },
+      drive: {
+        used: driveUsage,
+        percentage: limit > 0 ? Math.round((driveUsage / limit) * 100) : 0,
+        formattedUsed: formatBytes(driveUsage)
+      },
+      gmail: {
+        used: gmailUsage,
+        percentage: limit > 0 ? Math.round((gmailUsage / limit) * 100) : 0,
+        formattedUsed: formatBytes(gmailUsage)
+      },
+      photos: {
+        used: photosUsage,
+        percentage: limit > 0 ? Math.round((photosUsage / limit) * 100) : 0,
+        formattedUsed: formatBytes(photosUsage)
+      },
+      trash: {
+        used: trashUsage,
+        percentage: limit > 0 ? Math.round((trashUsage / limit) * 100) : 0,
+        formattedUsed: formatBytes(trashUsage)
+      }
+    };
+
+    console.log('Final storage data being sent:', storageData);
+    res.json(storageData);
+    
+  } catch (error) {
+    console.error("Storage quota error:", error);
+    
+    const fallbackData = {
+      total: { used: 0, limit: 0, percentage: 0, formattedUsed: "0 B", formattedLimit: "0 B" },
+      drive: { used: 0, percentage: 0, formattedUsed: "0 B" },
+      gmail: { used: 0, percentage: 0, formattedUsed: "0 B" },
+      photos: { used: 0, percentage: 0, formattedUsed: "0 B" },
+      trash: { used: 0, percentage: 0, formattedUsed: "0 B" }
+    };
+    
+    res.status(500).json({ 
+      message: "Failed to fetch storage quota",
+      error: error.message,
+      data: fallbackData
+    });
   }
 };

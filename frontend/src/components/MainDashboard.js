@@ -12,6 +12,8 @@ import {
   RefreshCw,
   Shield,
   LogOut,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import DriveDashboard from "./Drive/DriveDashboard";
@@ -27,6 +29,46 @@ const MainDashboard = () => {
     duplicates: 0,
     spaceSaved: 0,
     lastScan: null,
+  });
+  const [storageData, setStorageData] = useState({
+  total: {
+    used: 0,
+    limit: 0,
+    percentage: 0,
+    formattedUsed: "0 B",
+    formattedLimit: "0 B"
+  },
+  gmail: {
+    used: 0,
+    percentage: 0,
+    formattedUsed: "0 B"
+  },
+  drive: {
+    used: 0,
+    percentage: 0,
+    formattedUsed: "0 B"
+  },
+  photos: {
+    used: 0,
+    percentage: 0,
+    formattedUsed: "0 B"
+  },
+  trash: {
+    used: 0,
+    percentage: 0,
+    formattedUsed: "0 B"
+  }
+});
+  const [showUsageDetails, setShowUsageDetails] = useState(false);
+
+  const [spamStats, setSpamStats] = useState({
+    count: 0,
+    totalSize: 0,
+    formattedSize: "0 B",
+  });
+  const [oldUnreadStats, setOldUnreadStats] = useState({
+    count: 0,
+    formattedSize: "0 B",
   });
   const [isRescanning, setIsRescanning] = useState(false);
   const [promotionalStats, setPromotionalStats] = useState({
@@ -44,6 +86,51 @@ const MainDashboard = () => {
 
   const params = new URLSearchParams(window.location.search);
   const token = params.get("token");
+
+  const formatBytes = (bytes) => {
+    if (bytes === 0) return "0 B";
+    const k = 1024;
+    const sizes = ["B", "KB", "MB", "GB", "TB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+  };
+
+  const fetchStorageQuota = useCallback(async () => {
+  if (!token) return;
+
+  try {
+    console.log("Fetching storage quota...");
+    const res = await fetch("http://localhost:5000/api/user/storage-quota", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!res.ok) {
+      console.error("Storage quota fetch failed:", res.status, res.statusText);
+      const errorData = await res.json();
+      
+      // Use fallback data if API fails but still has fallback data
+      if (errorData.data) {
+        console.log("Using fallback storage data");
+        setStorageData(errorData.data);
+      }
+      return;
+    }
+
+    const data = await res.json();
+    console.log("Storage quota data received:", data);
+    
+    // Validate data structure before setting
+    if (data && data.total && typeof data.total.percentage === 'number') {
+      setStorageData(data);
+    } else {
+      console.warn("Invalid storage data structure received:", data);
+    }
+  } catch (error) {
+    console.error("Failed to fetch storage quota:", error);
+  }
+}, [token]);
 
   const fetchUserProfile = useCallback(async () => {
     if (!token) return;
@@ -68,6 +155,58 @@ const MainDashboard = () => {
     }
   }, [token]);
 
+  const fetchSpamStats = useCallback(async () => {
+    if (!token) return;
+    try {
+      const res = await fetch("http://localhost:5000/api/gmail/spam", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!res.ok) throw new Error("Failed to fetch spam emails");
+
+      const data = await res.json();
+
+      // Calculate total size (approximate 25KB per spam email - typically smaller than promotional)
+      const approximateSize = data.length * 25 * 1024; // 25KB per email
+
+      const formatBytes = (bytes) => {
+        if (bytes === 0) return "0 B";
+        const k = 1024;
+        const sizes = ["B", "KB", "MB", "GB", "TB"];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+      };
+
+      setSpamStats({
+        count: data.length,
+        totalSize: approximateSize,
+        formattedSize: formatBytes(approximateSize),
+      });
+    } catch (err) {
+      console.error("Error fetching spam stats:", err);
+    }
+  }, [token]);
+
+  const fetchOldUnreadStats = useCallback(async () => {
+    if (!token) return;
+    try {
+      const res = await fetch("http://localhost:5000/api/gmail/old-unread", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Failed to fetch old unread emails");
+      const data = await res.json();
+
+      const approximateSize = data.length * 20 * 1024; // 20KB per old unread email
+      setOldUnreadStats({
+        count: data.length,
+        formattedSize: formatBytes(approximateSize),
+      });
+    } catch (err) {
+      console.error("Error fetching old unread stats:", err);
+    }
+  }, [token]);
   // NEW FUNCTION: Fetch duplicate statistics
   const fetchDuplicateStats = useCallback(async () => {
     if (!token) return;
@@ -152,12 +291,220 @@ const MainDashboard = () => {
     }
   }, [token]);
 
+  const StorageHealthCard = () => {
+  const getStorageColor = (percentage) => {
+    if (percentage >= 90) return 'red';
+    if (percentage >= 75) return 'yellow';
+    return 'blue';
+  };
+
+  const storageColor = getStorageColor(storageData.total.percentage);
+
+  return (
+    <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
+      <div className="text-center mb-6">
+        <h2 className="text-2xl font-semibold text-gray-900 mb-2">
+          Storage {storageData.total.percentage}% full
+        </h2>
+        <p className="text-gray-600 text-sm">
+          Your storage is shared across Google Photos, Drive, Gmail and more
+        </p>
+      </div>
+
+      {/* Main Storage Bar */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-sm font-medium text-gray-700">Storage used</span>
+          <span className="text-sm font-medium text-gray-900">
+            {storageData.total.formattedUsed} of {storageData.total.formattedLimit}
+          </span>
+        </div>
+        
+        {/* Multi-segment progress bar */}
+        <div className="w-full bg-gray-200 rounded-full h-4 mb-4 overflow-hidden relative">
+          <div className="h-full flex">
+            {/* Google Photos segment - Yellow/Orange */}
+            <div 
+              className="bg-yellow-500 h-full transition-all duration-300"
+              style={{ 
+                width: `${Math.min(storageData.photos.percentage, 100)}%` 
+              }}
+              title={`Google Photos: ${storageData.photos.formattedUsed}`}
+            />
+            {/* Google Drive segment - Blue */}
+            <div 
+              className="bg-blue-500 h-full transition-all duration-300"
+              style={{ 
+                width: `${Math.min(storageData.drive.percentage, 100)}%` 
+              }}
+              title={`Google Drive: ${storageData.drive.formattedUsed}`}
+            />
+            {/* Gmail segment - Red */}
+            <div 
+              className="bg-red-500 h-full transition-all duration-300"
+              style={{ 
+                width: `${Math.min(storageData.gmail.percentage, 100)}%` 
+              }}
+              title={`Gmail: ${storageData.gmail.formattedUsed}`}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Usage Details Toggle */}
+      <button
+        onClick={() => setShowUsageDetails(!showUsageDetails)}
+        className="flex items-center justify-center w-full py-3 text-sm text-gray-600 hover:text-gray-800 transition-colors duration-200 rounded-lg hover:bg-gray-50"
+      >
+        <span className="mr-2 font-medium">Usage details</span>
+        {showUsageDetails ? (
+          <ChevronUp size={16} className="transition-transform duration-200" />
+        ) : (
+          <ChevronDown size={16} className="transition-transform duration-200" />
+        )}
+      </button>
+
+      {/* Detailed Usage Breakdown */}
+      {showUsageDetails && (
+        <div className="mt-4 pt-4 border-t border-gray-200 space-y-4">
+          {/* Google Photos */}
+          <div className="flex items-center justify-between py-2">
+            <div className="flex items-center space-x-3">
+              <div className="w-4 h-4 bg-yellow-500 rounded-full shadow-sm"></div>
+              <div className="flex flex-col">
+                <span className="text-sm font-medium text-gray-900">Google Photos</span>
+                <span className="text-xs text-gray-500">
+                  {storageData.photos.percentage}% of total storage
+                </span>
+              </div>
+            </div>
+            <div className="text-right">
+              <span className="text-sm font-semibold text-gray-900">
+                {storageData.photos.formattedUsed}
+              </span>
+            </div>
+          </div>
+
+          {/* Google Drive */}
+          <div className="flex items-center justify-between py-2">
+            <div className="flex items-center space-x-3">
+              <div className="w-4 h-4 bg-blue-500 rounded-full shadow-sm"></div>
+              <div className="flex flex-col">
+                <span className="text-sm font-medium text-gray-900">Google Drive</span>
+                <span className="text-xs text-gray-500">
+                  {storageData.drive.percentage}% of total storage
+                </span>
+              </div>
+            </div>
+            <div className="text-right">
+              <span className="text-sm font-semibold text-gray-900">
+                {storageData.drive.formattedUsed}
+              </span>
+            </div>
+          </div>
+
+          {/* Gmail */}
+          <div className="flex items-center justify-between py-2">
+            <div className="flex items-center space-x-3">
+              <div className="w-4 h-4 bg-red-500 rounded-full shadow-sm"></div>
+              <div className="flex flex-col">
+                <span className="text-sm font-medium text-gray-900">Gmail</span>
+                <span className="text-xs text-gray-500">
+                  {storageData.gmail.percentage}% of total storage
+                </span>
+              </div>
+            </div>
+            <div className="text-right">
+              <span className="text-sm font-semibold text-gray-900">
+                {storageData.gmail.formattedUsed}
+              </span>
+            </div>
+          </div>
+
+          {/* Storage Status Indicator */}
+          <div className={`mt-4 p-3 rounded-lg border-l-4 ${
+            storageColor === 'red' 
+              ? 'bg-red-50 border-red-400' 
+              : storageColor === 'yellow'
+              ? 'bg-yellow-50 border-yellow-400'
+              : 'bg-blue-50 border-blue-400'
+          }`}>
+            <p className={`text-sm font-medium ${
+              storageColor === 'red' 
+                ? 'text-red-800' 
+                : storageColor === 'yellow'
+                ? 'text-yellow-800'
+                : 'text-blue-800'
+            }`}>
+              {storageColor === 'red' 
+                ? '⚠️ Storage almost full' 
+                : storageColor === 'yellow'
+                ? '💾 Storage filling up'
+                : '✅ Storage healthy'
+              }
+            </p>
+            <p className={`text-xs mt-1 ${
+              storageColor === 'red' 
+                ? 'text-red-600' 
+                : storageColor === 'yellow'
+                ? 'text-yellow-600'
+                : 'text-blue-600'
+            }`}>
+              {storageColor === 'red' 
+                ? 'Consider cleaning up files or upgrading storage' 
+                : storageColor === 'yellow'
+                ? 'You may want to review and clean up files'
+                : 'Your storage usage looks good'
+              }
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Action Buttons */}
+      <div className="mt-6 pt-4 border-t border-gray-200 space-y-3">
+        <button
+          onClick={fetchStorageQuota}
+          className="flex items-center justify-center w-full py-3 px-4 text-sm text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-all duration-200 font-medium border border-blue-200 hover:border-blue-300"
+        >
+          <RefreshCw size={16} className="mr-2" />
+          Refresh Storage Data
+        </button>
+        
+        {storageData.total.percentage > 75 && (
+          <button
+            onClick={() => {
+              // Navigate to cleanup sections
+              setActiveTab('gmail');
+            }}
+            className={`flex items-center justify-center w-full py-3 px-4 text-sm text-white rounded-lg transition-all duration-200 font-medium shadow-sm hover:shadow-md ${
+              storageColor === 'red'
+                ? 'bg-red-500 hover:bg-red-600'
+                : 'bg-yellow-500 hover:bg-yellow-600'
+            }`}
+          >
+            <AlertTriangle size={16} className="mr-2" />
+            Free Up Space
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
   useEffect(() => {
     if (token) {
       fetchRecentActivities();
       fetchPromotionalStats();
+      fetchSpamStats();
+      fetchOldUnreadStats();
     }
-  }, [token, fetchRecentActivities, fetchPromotionalStats]);
+  }, [
+    token,
+    fetchRecentActivities,
+    fetchPromotionalStats,
+    fetchSpamStats,
+    fetchOldUnreadStats,
+  ]);
   // NEW FUNCTION: Handle Drive Rescan
   const handleRescanDriveFiles = async () => {
     if (!token) return;
@@ -246,11 +593,13 @@ const MainDashboard = () => {
   useEffect(() => {
     if (token) {
       fetchUserProfile();
-      fetchDuplicateStats(); // Fetch duplicate stats
+      fetchStorageQuota();
+      fetchDuplicateStats();
+      // Fetch duplicate stats
     } else {
       setLoading(false);
     }
-  }, [token, fetchUserProfile, fetchDuplicateStats]);
+  }, [token, fetchUserProfile, fetchDuplicateStats, fetchStorageQuota]);
 
   // Update stats when duplicateStats or user changes
   useEffect(() => {
@@ -576,7 +925,7 @@ const MainDashboard = () => {
                     <QuickActionCard
                       icon={Mail}
                       title="Gmail Cleanup"
-                      description="Find duplicate emails, large attachments, promotional clutter, and organize your inbox intelligently."
+                      description="Find duplicate emails, large attachments, promotional clutter, and organize your inbox."
                       action={() => setActiveTab("gmail")}
                       status="active"
                       color="red"
@@ -620,9 +969,6 @@ const MainDashboard = () => {
                             files in Drive
                           </p>
                           <div className="flex items-center space-x-2 mt-1">
-                            <p className="text-xs text-gray-500">
-                              {stats.lastScan}
-                            </p>
                             <span className="text-xs text-gray-400">•</span>
                             <p className="text-xs font-medium text-green-600">
                               Can save {duplicateStats.wastedSpaceFormatted}
@@ -648,12 +994,58 @@ const MainDashboard = () => {
                             in Gmail
                           </p>
                           <div className="flex items-center space-x-2 mt-1">
-                            <p className="text-xs text-gray-500">
-                              {stats.lastScan}
-                            </p>
                             <span className="text-xs text-gray-400">•</span>
                             <p className="text-xs font-medium text-green-600">
                               Can save {promotionalStats.formattedSize}
+                            </p>
+                          </div>
+                        </div>
+                        <CheckCircle2
+                          size={16}
+                          className="text-green-500 group-hover:scale-110 transition-transform duration-200"
+                        />
+                      </div>
+                    )}
+
+                    {/* Third card - Spam emails */}
+                    {spamStats.count > 0 && (
+                      <div className="flex items-center space-x-4 p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors duration-200 cursor-pointer group">
+                        <div className="p-3 bg-orange-100 text-orange-600 rounded-xl shadow-sm group-hover:scale-105 transition-transform duration-200">
+                          <AlertTriangle size={18} />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-gray-900 group-hover:text-gray-700">
+                            Found {spamStats.count} spam emails in Gmail
+                          </p>
+                          <div className="flex items-center space-x-2 mt-1">
+                            <span className="text-xs text-gray-400">•</span>
+                            <p className="text-xs font-medium text-green-600">
+                              Can save {spamStats.formattedSize}
+                            </p>
+                          </div>
+                        </div>
+                        <CheckCircle2
+                          size={16}
+                          className="text-green-500 group-hover:scale-110 transition-transform duration-200"
+                        />
+                      </div>
+                    )}
+
+                    {/* Sixth card - Old unread emails */}
+                    {oldUnreadStats.count > 0 && (
+                      <div className="flex items-center space-x-4 p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors duration-200 cursor-pointer group">
+                        <div className="p-3 bg-indigo-100 text-indigo-600 rounded-xl shadow-sm group-hover:scale-105 transition-transform duration-200">
+                          <Clock size={18} />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-gray-900 group-hover:text-gray-700">
+                            Found {oldUnreadStats.count} old unread emails (6+
+                            months)
+                          </p>
+                          <div className="flex items-center space-x-2 mt-1">
+                            <span className="text-xs text-gray-400">•</span>
+                            <p className="text-xs font-medium text-green-600">
+                              Can clean {oldUnreadStats.formattedSize}
                             </p>
                           </div>
                         </div>
@@ -712,70 +1104,17 @@ const MainDashboard = () => {
                   </div>
                 </div>
 
-                {/* Storage Health Overview */}
+                {/* Storage Health Overview - Updated with real data */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                      Storage Health
-                    </h3>
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          <Mail size={16} className="text-red-500" />
-                          <span className="text-sm text-gray-700">Gmail</span>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <div className="w-20 bg-gray-200 rounded-full h-2">
-                            <div
-                              className="bg-red-500 h-2 rounded-full"
-                              style={{ width: "75%" }}
-                            ></div>
-                          </div>
-                          <span className="text-xs text-gray-500">75%</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          <HardDrive size={16} className="text-blue-500" />
-                          <span className="text-sm text-gray-700">
-                            Google Drive
-                          </span>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <div className="w-20 bg-gray-200 rounded-full h-2">
-                            <div
-                              className="bg-blue-500 h-2 rounded-full"
-                              style={{ width: "45%" }}
-                            ></div>
-                          </div>
-                          <span className="text-xs text-gray-500">45%</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          <File size={16} className="text-green-500" />
-                          <span className="text-sm text-gray-700">
-                            Local Storage
-                          </span>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <div className="w-20 bg-gray-200 rounded-full h-2">
-                            <div
-                              className="bg-green-500 h-2 rounded-full"
-                              style={{ width: "60%" }}
-                            ></div>
-                          </div>
-                          <span className="text-xs text-gray-500">60%</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  {/* Replace the old storage health card with the new one */}
+                  <StorageHealthCard />
 
                   <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
                     <h3 className="text-lg font-semibold text-gray-900 mb-4">
                       Optimization Suggestions
                     </h3>
                     <div className="space-y-3">
+                      {/* Gmail Promotional Emails Card */}
                       <div className="flex items-start space-x-3 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
                         <AlertTriangle
                           size={16}
@@ -786,10 +1125,14 @@ const MainDashboard = () => {
                             Gmail needs attention
                           </p>
                           <p className="text-xs text-yellow-700">
-                            127 promotional emails found
+                            {promotionalStats.count > 0
+                              ? `${promotionalStats.count} promotional emails found`
+                              : "No promotional emails detected"}
                           </p>
                         </div>
                       </div>
+
+                      {/* Drive Duplicates Card */}
                       <div className="flex items-start space-x-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
                         <CheckCircle2
                           size={16}
@@ -800,11 +1143,14 @@ const MainDashboard = () => {
                             Drive optimization available
                           </p>
                           <p className="text-xs text-blue-700">
-                            {duplicateStats.duplicateCount} duplicate files
-                            detected
+                            {duplicateStats.duplicateCount > 0
+                              ? `${duplicateStats.duplicateCount} duplicate files detected`
+                              : "No duplicate files found"}
                           </p>
                         </div>
                       </div>
+
+                      {/* Local Scan Card - Keep as placeholder/encouragement */}
                       <div className="flex items-start space-x-3 p-3 bg-green-50 rounded-lg border border-green-200">
                         <Zap size={16} className="text-green-600 mt-0.5" />
                         <div>
@@ -812,10 +1158,65 @@ const MainDashboard = () => {
                             Local scan recommended
                           </p>
                           <p className="text-xs text-green-700">
-                            Downloads folder not scanned
+                            Downloads folder not scanned recently
                           </p>
                         </div>
                       </div>
+
+                      {/* Summary Card - Show total potential savings */}
+                      {(promotionalStats.count > 0 ||
+                        duplicateStats.duplicateCount > 0 ||
+                        spamStats.count > 0) && (
+                        <div className="flex items-start space-x-3 p-3 bg-gradient-to-r from-blue-50 to-green-50 rounded-lg border border-blue-200">
+                          <CheckCircle2
+                            size={16}
+                            className="text-blue-600 mt-0.5"
+                          />
+                          <div>
+                            <p className="text-sm font-medium text-blue-800">
+                              Total optimization potential
+                            </p>
+                            <p className="text-xs text-blue-700">
+                              Can save approximately{" "}
+                              {
+                                // Calculate total potential savings
+                                (() => {
+                                  const promotionalSize =
+                                    promotionalStats.totalSize || 0;
+                                  const spamSize = spamStats.totalSize || 0;
+                                  const duplicateSize =
+                                    duplicateStats.wastedSpace || 0;
+                                  const totalBytes =
+                                    promotionalSize + spamSize + duplicateSize;
+                                  return formatBytes(totalBytes);
+                                })()
+                              }{" "}
+                              across all platforms
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Empty State - When no issues found */}
+                      {promotionalStats.count === 0 &&
+                        duplicateStats.duplicateCount === 0 &&
+                        spamStats.count === 0 &&
+                        oldUnreadStats.count === 0 && (
+                          <div className="flex items-start space-x-3 p-3 bg-green-50 rounded-lg border border-green-200">
+                            <CheckCircle2
+                              size={16}
+                              className="text-green-600 mt-0.5"
+                            />
+                            <div>
+                              <p className="text-sm font-medium text-green-800">
+                                All systems optimized!
+                              </p>
+                              <p className="text-xs text-green-700">
+                                No immediate cleanup actions needed
+                              </p>
+                            </div>
+                          </div>
+                        )}
                     </div>
                   </div>
                 </div>

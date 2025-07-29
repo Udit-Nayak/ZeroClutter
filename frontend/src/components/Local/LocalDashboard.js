@@ -12,7 +12,6 @@ const LocalDashboard = () => {
   const [error, setError] = useState(null);
   const [folderName, setFolderName] = useState("");
 
-
   const checkScanStatus = useCallback(async () => {
   const token = localStorage.getItem("token");
   try {
@@ -32,11 +31,9 @@ const LocalDashboard = () => {
   }
 }, []);
 
-
   useEffect(() => {
     checkScanStatus();
   }, [checkScanStatus]);
-
 
   const handleFolderPick = async () => {
     setError(null);
@@ -45,7 +42,6 @@ const LocalDashboard = () => {
       setIsScanning(true);
       setScanComplete(false);
       
-      // Check if File System Access API is supported
       if (!window.showDirectoryPicker) {
         throw new Error("Your browser doesn't support folder access. Please use a modern browser like Chrome or Edge.");
       }
@@ -60,7 +56,6 @@ const LocalDashboard = () => {
         throw new Error("No files found in the selected folder");
       }
       
-      // Send file metadata to backend for processing
       const response = await fetch("http://localhost:5000/api/localFiles/scan", {
         method: "POST",
         headers: {
@@ -90,7 +85,6 @@ const LocalDashboard = () => {
       setFolderName(data.stats?.folderName || dirHandle.name);
       setScanComplete(true);
       
-      // Group duplicates properly
       const groups = groupDuplicatesByHash(data.duplicates || []);
       setDuplicateGroups(groups);
       
@@ -122,7 +116,6 @@ const LocalDashboard = () => {
           try {
             const file = await entry.getFile();
             
-            // Skip very large files (>1GB) for performance
             if (file.size > 1024 * 1024 * 1024) {
               console.warn(`Skipping large file: ${entry.name} (${formatFileSize(file.size)})`);
               continue;
@@ -135,7 +128,7 @@ const LocalDashboard = () => {
               type: file.type || getFileExtension(file.name),
               lastModified: file.lastModified,
               contentHash: await generateImprovedFileHash(file),
-              fileHandle: entry // Store handle for potential future operations
+              fileHandle: entry
             };
             
             files.push(fileData);
@@ -144,7 +137,6 @@ const LocalDashboard = () => {
             console.warn(`Could not access file: ${entry.name}`, fileErr.message);
           }
         } else if (entry.kind === "directory" && !shouldSkipDirectory(entry.name)) {
-          // Recursively process subdirectories
           try {
             const subFiles = await processDirectory(entry, fullPath, maxFiles - processedCount);
             files.push(...subFiles);
@@ -172,42 +164,32 @@ const LocalDashboard = () => {
     );
   };
 
-  // Improved file hash generation for better duplicate detection
   const generateImprovedFileHash = async (file) => {
     try {
-      // For small files (<10MB), hash the entire content
       if (file.size <= 10 * 1024 * 1024) {
         const buffer = await file.arrayBuffer();
         return await hashBuffer(buffer);
       }
       
-      // For larger files, use a more sophisticated approach
-      // Hash: beginning + middle + end + metadata
-      const chunkSize = 64 * 1024; // 64KB chunks
+      const chunkSize = 64 * 1024; 
       const chunks = [];
       
-      // Beginning chunk
       chunks.push(file.slice(0, chunkSize));
       
-      // Middle chunk
       const middleStart = Math.floor(file.size / 2) - Math.floor(chunkSize / 2);
       chunks.push(file.slice(middleStart, middleStart + chunkSize));
       
-      // End chunk
       chunks.push(file.slice(-chunkSize));
       
-      // Combine all chunks
       const combinedChunks = [];
       for (const chunk of chunks) {
         const buffer = await chunk.arrayBuffer();
         combinedChunks.push(new Uint8Array(buffer));
       }
       
-      // Add file metadata to make hash more unique
       const metadata = `${file.size}-${file.lastModified}-${file.type}`;
       combinedChunks.push(new TextEncoder().encode(metadata));
       
-      // Create final buffer and hash
       const totalLength = combinedChunks.reduce((sum, chunk) => sum + chunk.length, 0);
       const finalBuffer = new Uint8Array(totalLength);
       let offset = 0;
@@ -221,26 +203,22 @@ const LocalDashboard = () => {
       
     } catch (err) {
       console.warn("Error generating improved file hash:", err);
-      // Fallback to simple hash
       return generateSimpleFileHash(file);
     }
   };
 
-  // Hash buffer using Web Crypto API
   const hashBuffer = async (buffer) => {
     if (window.crypto && window.crypto.subtle) {
       const hashBuffer = await window.crypto.subtle.digest('SHA-256', buffer);
       return Array.from(new Uint8Array(hashBuffer))
         .map(b => b.toString(16).padStart(2, '0'))
         .join('')
-        .substring(0, 32); // Use longer hash for better uniqueness
+        .substring(0, 32); 
     } else {
-      // Fallback for older browsers
       return generateSimpleHashFromBuffer(buffer);
     }
   };
 
-  // Simple fallback hash generation
   const generateSimpleFileHash = async (file) => {
     const hashInput = `${file.name}-${file.size}-${file.lastModified}`;
     return btoa(hashInput).replace(/[^a-zA-Z0-9]/g, '').substring(0, 20);
@@ -298,16 +276,13 @@ const LocalDashboard = () => {
       const result = await response.json();
 
       if (response.ok && result.success) {
-        // Remove from all lists
         setFiles(prev => prev.filter(f => f.fullPath !== filePath));
         setDuplicates(prev => prev.filter(f => f.fullPath !== filePath));
         setLargest(prev => prev.filter(f => f.fullPath !== filePath));
         
-        // Update duplicate groups
         const newDuplicates = duplicates.filter(f => f.fullPath !== filePath);
         setDuplicateGroups(groupDuplicatesByHash(newDuplicates));
         
-        // Update stats
         if (stats) {
           setStats(prev => ({
             ...prev,

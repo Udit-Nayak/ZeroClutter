@@ -253,8 +253,7 @@ function FilterPanel({ filters, onChange, onApply }) {
             alignItems: "center",
             gap: "0.5rem"
           }}>
-            <Search size={14} />
-            Search by Name
+            <Search size={14} />Search by Name
           </label>
           <input
             name="name"
