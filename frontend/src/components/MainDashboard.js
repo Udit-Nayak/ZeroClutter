@@ -790,7 +790,7 @@ const MainDashboard = () => {
                 </div>
                 <div>
                   <h1 className="text-xl font-bold text-gray-900">
-                    Duplicatro
+                    ZeroClutter{" "}
                   </h1>
                   <p className="text-xs text-gray-500">
                     Smart Duplicate Detection

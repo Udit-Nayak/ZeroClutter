@@ -86,7 +86,7 @@ const LoadingSpinner = () => (
       <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl mb-4">
         <div className="loading-spinner border-white"></div>
       </div>
-      <h2 className="text-lg font-medium text-gray-900 mb-2">Loading Duplicatro</h2>
+      <h2 className="text-lg font-medium text-gray-900 mb-2">Loading ZeroClutter</h2>
       <p className="text-gray-600">Please wait while we set up your dashboard...</p>
     </div>
   </div>
@@ -206,7 +206,7 @@ const root = ReactDOM.createRoot(document.getElementById("root"));
 
 // Add performance monitoring
 if (process.env.NODE_ENV === 'development') {
-  console.log('🚀 Duplicatro App starting in development mode');
+  console.log('🚀 ZeroClutter App starting in development mode');
 }
 
 // Render the app
