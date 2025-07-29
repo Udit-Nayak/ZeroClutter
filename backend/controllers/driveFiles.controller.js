@@ -2,12 +2,14 @@ const { google } = require("googleapis");
 const { getOAuth2Client } = require("../libs/googleOAuth");
 const pool = require("../db");
 
-
 const rescanDriveFiles = async (req, res) => {
   try {
     const user = req.user;
     if (!user || !user.google_tokens) {
-      return res.status(400).json({ error: "Google Drive not connected" });
+      return res.status(400).json({ 
+        success: false,
+        error: "Google Drive not connected" 
+      });
     }
 
     const auth = getOAuth2Client();
@@ -87,10 +89,19 @@ const rescanDriveFiles = async (req, res) => {
       [user.id, 'rescan', files.length, null]
     );
 
-    res.json({ message: "Drive re-scanned and database updated." });
+    res.json({ 
+      success: true,
+      message: "Drive re-scanned and database updated.",
+      scanned_files: files.length,
+      deleted_files: deletedIds.length
+    });
   } catch (err) {
     console.error("❌ Failed to rescan drive:", err.message);
-    res.status(500).json({ error: "Rescan failed" });
+    res.status(500).json({ 
+      success: false,
+      error: "Rescan failed",
+      message: err.message 
+    });
   }
 };
 
@@ -98,7 +109,10 @@ const scanDriveFiles = async (req, res) => {
   try {
     const user = req.user;
     if (!user || !user.google_tokens) {
-      return res.status(400).json({ error: "Google Drive not connected" });
+      return res.status(400).json({ 
+        success: false,
+        error: "Google Drive not connected" 
+      });
     }
 
     const auth = getOAuth2Client();
@@ -137,7 +151,7 @@ const scanDriveFiles = async (req, res) => {
             file.mimeType,
             file.modifiedTime,
             file.parents?.[0] || null,
-            file.md5Checksum || null, //
+            file.md5Checksum || null,
           ]
         );
       } catch (err) {
@@ -146,10 +160,19 @@ const scanDriveFiles = async (req, res) => {
     }
 
     const tree = buildDriveTree(files);
-    res.json({ message: "Drive scanned and tree built", tree });
+    res.json({ 
+      success: true,
+      message: "Drive scanned and tree built", 
+      tree,
+      scanned_files: files.length
+    });
   } catch (err) {
     console.error("❌ Error scanning Drive:", err);
-    res.status(500).json({ error: "Failed to scan Google Drive" });
+    res.status(500).json({ 
+      success: false,
+      error: "Failed to scan Google Drive",
+      message: err.message 
+    });
   }
 };
 
@@ -202,7 +225,11 @@ const listDriveFiles = async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error("❌ Error fetching filtered/sorted drive files:", err);
-    res.status(500).json({ error: "Failed to fetch drive files" });
+    res.status(500).json({ 
+      success: false,
+      error: "Failed to fetch drive files",
+      message: err.message 
+    });
   }
 };
 
@@ -210,7 +237,10 @@ const getDuplicateStats = async (req, res) => {
   try {
     const user = req.user;
     if (!user) {
-      return res.status(400).json({ error: "User not authenticated" });
+      return res.status(400).json({ 
+        success: false,
+        error: "User not authenticated" 
+      });
     }
 
     const duplicateQuery = `
@@ -247,28 +277,32 @@ const getDuplicateStats = async (req, res) => {
       return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
     };
 
-    // Only insert activity log if there are actually duplicates found
-    // This should be called when duplicates are actually DELETED, not just when stats are fetched
-    // Remove this from here and add it to a separate delete duplicates endpoint
-
     res.json({
+      success: true,
       duplicateCount: totalDuplicates,
       wastedSpace: totalWastedSpace,
       wastedSpaceFormatted: formatBytes(totalWastedSpace),
-      duplicateGroups: result.rows.length
+      duplicateGroups: result.rows.length,
+      lastUpdated: new Date().toISOString()
     });
 
   } catch (err) {
     console.error("❌ Error fetching duplicate stats:", err);
-    res.status(500).json({ error: "Failed to fetch duplicate statistics" });
+    res.status(500).json({ 
+      success: false,
+      error: "Failed to fetch duplicate statistics",
+      message: err.message 
+    });
   }
 };
-
 
 const getRecentActivities = async (req, res) => {
   try {
     const user = req.user;
-    if (!user) return res.status(401).json({ error: "Not authorized" });
+    if (!user) return res.status(401).json({ 
+      success: false,
+      error: "Not authorized" 
+    });
 
     const result = await pool.query(
       `SELECT action, type, saved_bytes, created_at
@@ -294,19 +328,28 @@ const getRecentActivities = async (req, res) => {
       time: row.created_at,
     }));
 
-    res.json({ activities });
+    res.json({ 
+      success: true,
+      activities 
+    });
   } catch (err) {
     console.error("❌ Error fetching activity logs:", err);
-    res.status(500).json({ error: "Failed to fetch activity logs" });
+    res.status(500).json({ 
+      success: false,
+      error: "Failed to fetch activity logs",
+      message: err.message 
+    });
   }
 };
-
 
 const emptyTrash = async (req, res) => {
   try {
     const user = req.user;
     if (!user.google_tokens) {
-      return res.status(400).json({ error: "Google Drive not connected" });
+      return res.status(400).json({ 
+        success: false,
+        error: "Google Drive not connected" 
+      });
     }
 
     const auth = getOAuth2Client();
@@ -315,10 +358,29 @@ const emptyTrash = async (req, res) => {
 
     await drive.files.emptyTrash();
     console.log(`🗑️ Trash emptied for user: ${user.email}`);
-    res.status(200).json({ message: "Trash emptied successfully." });
+    
+    // Log the activity
+    try {
+      await pool.query(
+        `INSERT INTO activity_logs (user_id, action, type, saved_bytes, created_at)
+         VALUES ($1, $2, $3, $4, NOW())`,
+        [user.id, 'Emptied trash', 'trash_cleanup', 0]
+      );
+    } catch (logErr) {
+      console.warn('Failed to log activity:', logErr.message);
+    }
+
+    res.status(200).json({ 
+      success: true,
+      message: "Trash emptied successfully." 
+    });
   } catch (error) {
     console.error("❌ Failed to empty trash:", error.message);
-    res.status(500).json({ error: "Failed to empty Drive trash" });
+    res.status(500).json({ 
+      success: false,
+      error: "Failed to empty Drive trash",
+      message: error.message 
+    });
   }
 };
 
@@ -348,5 +410,5 @@ module.exports = {
   emptyTrash,
   rescanDriveFiles,
   getDuplicateStats, 
-  getRecentActivities,// Export the new function
+  getRecentActivities,
 };
