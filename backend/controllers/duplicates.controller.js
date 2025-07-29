@@ -7,8 +7,16 @@ exports.getDuplicateFiles = async (req, res) => {
   try {
     const user = req.user;
 
+    if (!user) {
+      return res.status(401).json({ 
+        success: false,
+        error: "User not authenticated" 
+      });
+    }
+
+    console.log(`Fetching duplicates for user: ${user.id}`);
+
     // Fixed query: Group by content_hash only for true duplicates
-    // Don't group by name as files with same content can have different names
     const query = `
       SELECT 
         content_hash,
@@ -36,6 +44,8 @@ exports.getDuplicateFiles = async (req, res) => {
 
     const result = await pool.query(query, [user.id]);
     
+    console.log(`Found ${result.rows.length} duplicate groups`);
+    
     // Format for frontend compatibility - flatten to individual file records but group duplicates
     const duplicateFiles = [];
     
@@ -55,14 +65,16 @@ exports.getDuplicateFiles = async (req, res) => {
       }
     });
 
-    console.log(`Found ${duplicateFiles.length} duplicate files in ${result.rows.length} groups`);
+    const totalWastedSpace = duplicateFiles.reduce((sum, file) => sum + (file.wasted_space || 0), 0);
+
+    console.log(`Returning ${duplicateFiles.length} duplicate files in ${result.rows.length} groups, wasting ${totalWastedSpace} bytes`);
 
     res.status(200).json({
       success: true,
       data: duplicateFiles,
       total_groups: result.rows.length,
       total_duplicates: duplicateFiles.length,
-      total_wasted_space: duplicateFiles.reduce((sum, file) => sum + file.wasted_space, 0)
+      total_wasted_space: totalWastedSpace
     });
 
   } catch (err) {

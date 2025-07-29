@@ -1,5 +1,5 @@
 // src/components/Drive/useDrive.js
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import axios from "axios";
 
 const useDrive = (token) => {
@@ -8,38 +8,38 @@ const useDrive = (token) => {
   const [error, setError] = useState("");
   const [filters, setFilters] = useState({ name: "", sortBy: "", sortOrder: "" });
   const [isDuplicateMode, setIsDuplicateMode] = useState(false);
+  const [duplicateStats, setDuplicateStats] = useState(null);
 
-  const fetchDriveFiles = async (duplicateOnly = false) => {
+  const formatBytes = useCallback((bytes) => {
+    if (!bytes || bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  }, []);
+
+  const fetchDuplicateStats = useCallback(async () => {
+    if (!token) return;
+    
     try {
-      setLoading(true);
-      setIsDuplicateMode(duplicateOnly);
-      setError("");
-
-      if (!duplicateOnly) {
-        await axios.post("http://localhost:5000/api/driveFiles/scan", {}, {
-          headers: { Authorization: `Bearer ${token}` },
+      const response = await axios.get("http://localhost:5000/api/driveFiles/duplicates/stats", {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (response.data.success) {
+        setDuplicateStats({
+          totalDuplicates: response.data.duplicateCount || 0,
+          totalGroups: response.data.duplicateGroups || 0,
+          totalWastedSpace: response.data.wastedSpace || 0
         });
       }
-
-      const query = duplicateOnly ? "" : new URLSearchParams(filters).toString();
-      const endpoint = duplicateOnly
-        ? `http://localhost:5000/api/duplicates/`
-        : `http://localhost:5000/api/driveFiles/list?${query}`;
-
-      const res = await axios.get(endpoint, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      const flatFiles = res.data;
-      setFiles(buildTree(flatFiles));
     } catch (err) {
-      setError("Failed to fetch files.");
-    } finally {
-      setLoading(false);
+      console.error("Failed to fetch duplicate stats:", err);
+      // Don't set error for stats failure, it's not critical
     }
-  };
+  }, [token]);
 
-  const buildTree = (items) => {
+  const buildTree = useCallback((items) => {
     const map = {};
     const roots = [];
 
@@ -57,7 +57,79 @@ const useDrive = (token) => {
     });
 
     return roots;
-  };
+  }, []);
+
+  const fetchDriveFiles = useCallback(async (duplicateOnly = false) => {
+    try {
+      setLoading(true);
+      setIsDuplicateMode(duplicateOnly);
+      setError("");
+
+      if (duplicateOnly) {
+        // Fetch duplicate files
+        const res = await axios.get("http://localhost:5000/api/duplicates/", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        console.log("Duplicate API Response:", res.data);
+
+        if (res.data.success) {
+          // Use the data array from the API response
+          const duplicateFiles = res.data.data || [];
+          setFiles(duplicateFiles);
+          
+          // Update stats from the response
+          setDuplicateStats({
+            totalDuplicates: res.data.total_duplicates || 0,
+            totalGroups: res.data.total_groups || 0,
+            totalWastedSpace: res.data.total_wasted_space || 0
+          });
+        } else {
+          throw new Error(res.data.error || "Failed to fetch duplicates");
+        }
+      } else {
+        // Scan and fetch regular files
+        await axios.post("http://localhost:5000/api/driveFiles/scan", {}, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        const query = new URLSearchParams(filters).toString();
+        const res = await axios.get(`http://localhost:5000/api/driveFiles/list?${query}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        const flatFiles = res.data;
+        setFiles(buildTree(flatFiles));
+        
+        // Refresh duplicate stats after scanning
+        await fetchDuplicateStats();
+      }
+    } catch (err) {
+      console.error("Fetch files error:", err);
+      let errorMessage = "Failed to fetch files.";
+      
+      if (err.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      } else if (err.response?.data?.error) {
+        errorMessage = err.response.data.error;
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
+      setFiles([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [token, filters, buildTree, fetchDuplicateStats]);
+
+  const refreshDuplicates = useCallback(async () => {
+    if (isDuplicateMode) {
+      await fetchDriveFiles(true);
+    } else {
+      await fetchDuplicateStats();
+    }
+  }, [isDuplicateMode, fetchDriveFiles, fetchDuplicateStats]);
 
   return {
     files,
@@ -69,6 +141,9 @@ const useDrive = (token) => {
     isDuplicateMode,
     setError,
     setLoading,
+    duplicateStats,
+    refreshDuplicates,
+    formatBytes,
   };
 };
 

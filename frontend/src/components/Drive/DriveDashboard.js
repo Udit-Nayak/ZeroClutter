@@ -74,7 +74,7 @@ function DriveToolbar({ onList, onDuplicate, onTrash, onReports, loading, duplic
         Google Drive Management Tools
       </h3>
       
-      {duplicateStats && (
+      {duplicateStats && duplicateStats.totalDuplicates > 0 && (
         <div style={{
           backgroundColor: "#fef3c7",
           border: "1px solid #f59e0b",
