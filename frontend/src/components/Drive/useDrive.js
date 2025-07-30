@@ -1,4 +1,3 @@
-// src/components/Drive/useDrive.js
 import { useState, useCallback } from "react";
 import axios from "axios";
 
@@ -35,7 +34,6 @@ const useDrive = (token) => {
       }
     } catch (err) {
       console.error("Failed to fetch duplicate stats:", err);
-      // Don't set error for stats failure, it's not critical
     }
   }, [token]);
 
@@ -66,7 +64,6 @@ const useDrive = (token) => {
       setError("");
 
       if (duplicateOnly) {
-        // Fetch duplicate files
         const res = await axios.get("http://localhost:5000/api/duplicates/", {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -74,11 +71,8 @@ const useDrive = (token) => {
         console.log("Duplicate API Response:", res.data);
 
         if (res.data.success) {
-          // Use the data array from the API response
           const duplicateFiles = res.data.data || [];
           setFiles(duplicateFiles);
-          
-          // Update stats from the response
           setDuplicateStats({
             totalDuplicates: res.data.total_duplicates || 0,
             totalGroups: res.data.total_groups || 0,
@@ -88,7 +82,6 @@ const useDrive = (token) => {
           throw new Error(res.data.error || "Failed to fetch duplicates");
         }
       } else {
-        // Scan and fetch regular files
         await axios.post("http://localhost:5000/api/driveFiles/scan", {}, {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -100,8 +93,6 @@ const useDrive = (token) => {
 
         const flatFiles = res.data;
         setFiles(buildTree(flatFiles));
-        
-        // Refresh duplicate stats after scanning
         await fetchDuplicateStats();
       }
     } catch (err) {

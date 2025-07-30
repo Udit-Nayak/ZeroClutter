@@ -17,7 +17,6 @@ import {
   CheckCircle
 } from "lucide-react";
 
-// Enhanced DriveToolbar component
 function DriveToolbar({ onList, onDuplicate, onTrash, onReports, loading, duplicateStats }) {
   const buttonStyle = {
     display: "flex",
@@ -478,8 +477,6 @@ function DriveDashboard({ token: propToken }) {
       
       if (response.ok) {
         await response.json();
-        // Store stats for the toolbar
-        // This will be automatically updated when we call fetchDriveFiles(true)
       }
     } catch (err) {
       console.error("Failed to fetch duplicate stats:", err);
@@ -490,7 +487,6 @@ function DriveDashboard({ token: propToken }) {
     if (propToken) {
       setToken(propToken);
       setIsAuthenticated(true);
-      // Auto-fetch duplicate stats when component loads
       fetchDuplicateStats();
     } else {
       setError("No token found.");
@@ -507,7 +503,7 @@ function DriveDashboard({ token: propToken }) {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({ 
-          file_id: file.file_id // Delete specific file
+          file_id: file.file_id 
         })
       });
       
@@ -517,11 +513,8 @@ function DriveDashboard({ token: propToken }) {
         throw new Error(result.error || "Failed to delete duplicate");
       }
       
-      // Show success message
-      // eslint-disable-next-line no-alert
       alert(`Successfully deleted "${file.name}" and saved ${formatBytes(file.size)}`);
       
-      // Refresh the duplicate list
       await refreshDuplicates();
       
     } catch (err) {
@@ -557,7 +550,6 @@ function DriveDashboard({ token: propToken }) {
       // eslint-disable-next-line no-alert
       alert(`Successfully deleted ${result.deleted_count} duplicate files and saved ${formatBytes(result.saved_space)}`);
       
-      // Refresh the duplicate list
       await refreshDuplicates();
       
     } catch (err) {
@@ -759,7 +751,6 @@ function DriveDashboard({ token: propToken }) {
   );
 }
 
-// Component to display duplicate files with individual delete buttons
 function DuplicateFilesList({ files, onDeleteDuplicate, loading, formatBytes }) {
   const fileItemStyle = {
     display: "flex",

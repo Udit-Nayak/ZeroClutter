@@ -16,7 +16,6 @@ exports.getDuplicateFiles = async (req, res) => {
 
     console.log(`Fetching duplicates for user: ${user.id}`);
 
-    // Fixed query: Group by content_hash only for true duplicates
     const query = `
       SELECT 
         content_hash,
@@ -46,12 +45,10 @@ exports.getDuplicateFiles = async (req, res) => {
     
     console.log(`Found ${result.rows.length} duplicate groups`);
     
-    // Format for frontend compatibility - flatten to individual file records but group duplicates
     const duplicateFiles = [];
     
     result.rows.forEach(group => {
       const files = group.files;
-      // Skip the first file (keep it), mark others as duplicates
       for (let i = 1; i < files.length; i++) {
         duplicateFiles.push({
           ...files[i],
@@ -92,7 +89,6 @@ exports.deleteDuplicates = async (req, res) => {
     const user = req.user;
     const { content_hash, file_id } = req.body;
 
-    // Allow deletion by either content_hash (delete all duplicates) or specific file_id
     if (!content_hash && !file_id) {
       return res.status(400).json({ 
         success: false,
@@ -114,11 +110,9 @@ exports.deleteDuplicates = async (req, res) => {
     let queryText, queryParams;
     
     if (file_id) {
-      // Delete specific file
       queryText = `SELECT * FROM drive_files WHERE user_id = $1 AND file_id = $2`;
       queryParams = [user.id, file_id];
     } else {
-      // Delete all duplicates of a content hash (keep the most recent)
       queryText = `
         SELECT * FROM drive_files
         WHERE user_id = $1 AND content_hash = $2
@@ -140,18 +134,15 @@ exports.deleteDuplicates = async (req, res) => {
     let deletedCount = 0;
     let totalSavedSpace = 0;
 
-    // If deleting by content_hash, keep the most recent file (first in ordered result)
     const filesToDelete = file_id ? rows : rows.slice(1);
 
     for (const file of filesToDelete) {
       try {
-        // Check if user owns the file
         const metadata = await drive.files.get({
           fileId: file.file_id,
           fields: "owners,trashed",
         });
 
-        // Skip if already trashed
         if (metadata.data.trashed) {
           console.log(`File already trashed: ${file.file_id}`);
           continue;
@@ -166,13 +157,11 @@ exports.deleteDuplicates = async (req, res) => {
           continue;
         }
 
-        // Move to trash in Google Drive
         await drive.files.update({
           fileId: file.file_id,
           requestBody: { trashed: true },
         });
 
-        // Remove from our database
         await pool.query(
           `DELETE FROM drive_files WHERE user_id = $1 AND file_id = $2`,
           [user.id, file.file_id]
@@ -182,7 +171,6 @@ exports.deleteDuplicates = async (req, res) => {
         deletedCount++;
         totalSavedSpace += parseInt(file.size) || 0;
 
-        // Log the cleanup action
         await pool.query(
           `INSERT INTO cleanup_logs 
             (user_id, source, item_name, item_path, item_id, action, batch_id, timestamp)
@@ -203,7 +191,6 @@ exports.deleteDuplicates = async (req, res) => {
       }
     }
 
-    // Log activity if any files were deleted
     if (deletedCount > 0) {
       try {
         await pool.query(
@@ -234,7 +221,6 @@ exports.deleteDuplicates = async (req, res) => {
   }
 };
 
-// New endpoint to delete all duplicates at once
 exports.deleteAllDuplicates = async (req, res) => {
   try {
     const user = req.user;
@@ -246,7 +232,6 @@ exports.deleteAllDuplicates = async (req, res) => {
       });
     }
 
-    // Get all content hashes that have duplicates
     const duplicateHashesQuery = `
       SELECT content_hash
       FROM drive_files 
@@ -263,10 +248,8 @@ exports.deleteAllDuplicates = async (req, res) => {
     let totalDeleted = 0;
     let totalSaved = 0;
 
-    // Delete duplicates for each hash
     for (const { content_hash } of hashes) {
       try {
-        // Use the existing deleteDuplicates function
         const mockReq = { user, body: { content_hash } };
         const mockRes = {
           status: (code) => ({

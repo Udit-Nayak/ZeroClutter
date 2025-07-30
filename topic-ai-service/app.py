@@ -17,8 +17,6 @@ app = Flask(__name__)
 CORS(app)
 
 stop_words = set(stopwords.words("english"))
-
-# Enhanced junk/common topic terms to ignore
 JUNK_TOPICS = {
     "this", "your", "me", "to", "a", "you", "it", "the", "is", "are", "was", "were",
     "view", "new", "click", "login", "account", "hello", "email", "message", "update",
@@ -35,10 +33,7 @@ JUNK_TOPICS = {
     "given", "work", "worked", "working", "look", "looked", "looking", "feel", "felt",
     "feeling", "try", "tried", "trying", "keep", "kept", "keeping", "let", "put", "set"
 }
-
-# Enhanced topic name mapping with more categories
 TOPIC_NAME_OVERRIDES = {
-    # Social Media & Communication
     "linkedin": "LinkedIn",
     "snapchat": "Snapchat", 
     "instagram": "Instagram",
@@ -51,8 +46,6 @@ TOPIC_NAME_OVERRIDES = {
     "teams": "Microsoft Teams",
     "zoom": "Zoom Meetings",
     "skype": "Skype",
-    
-    # Development & Tech
     "github": "GitHub",
     "gitlab": "GitLab",
     "bitbucket": "Bitbucket",
@@ -69,8 +62,6 @@ TOPIC_NAME_OVERRIDES = {
     "heroku": "Heroku",
     "netlify": "Netlify",
     "vercel": "Vercel",
-    
-    # Job & Career
     "job": "Job Opportunities",
     "jobs": "Job Opportunities",
     "career": "Career Development",
@@ -84,8 +75,6 @@ TOPIC_NAME_OVERRIDES = {
     "opportunity": "Opportunities",
     "internship": "Internships",
     "freelance": "Freelance Work",
-    
-    # Learning & Education
     "course": "Online Courses",
     "courses": "Online Courses",
     "tutorial": "Tutorials",
@@ -101,8 +90,6 @@ TOPIC_NAME_OVERRIDES = {
     "edx": "EdX",
     "pluralsight": "Pluralsight",
     "skillshare": "Skillshare",
-    
-    # Business & Finance
     "invoice": "Billing & Invoices",
     "payment": "Payments",
     "billing": "Billing & Invoices",
@@ -117,8 +104,6 @@ TOPIC_NAME_OVERRIDES = {
     "startup": "Startups",
     "investment": "Investments",
     "funding": "Funding",
-    
-    # Marketing & Sales
     "newsletter": "Newsletters",
     "promotion": "Promotions",
     "offer": "Special Offers",
@@ -129,8 +114,6 @@ TOPIC_NAME_OVERRIDES = {
     "campaign": "Campaigns",
     "advertisement": "Advertisements",
     "affiliate": "Affiliate Marketing",
-    
-    # Entertainment & Content
     "youtube": "YouTube",
     "podcast": "Podcasts",
     "blog": "Blogs",
@@ -146,8 +129,6 @@ TOPIC_NAME_OVERRIDES = {
     "spotify": "Spotify",
     "netflix": "Netflix",
     "amazon": "Amazon",
-    
-    # Events & Meetings
     "event": "Events",
     "conference": "Conferences",
     "meetup": "Meetups",
@@ -157,8 +138,6 @@ TOPIC_NAME_OVERRIDES = {
     "calendar": "Calendar Events",
     "reminder": "Reminders",
     "invitation": "Invitations",
-    
-    # Security & Notifications
     "security": "Security Alerts",
     "alert": "Alerts",
     "notification": "Notifications",
@@ -169,8 +148,6 @@ TOPIC_NAME_OVERRIDES = {
     "login": "Login Activity",
     "signin": "Sign-in Activity",
     "backup": "Backups",
-    
-    # Health & Wellness
     "health": "Health & Wellness",
     "fitness": "Fitness",
     "medical": "Medical",
@@ -178,8 +155,6 @@ TOPIC_NAME_OVERRIDES = {
     "appointment": "Medical Appointments",
     "pharmacy": "Pharmacy",
     "insurance": "Insurance",
-    
-    # Travel & Transportation
     "travel": "Travel",
     "flight": "Flights",
     "hotel": "Hotels",
@@ -189,8 +164,6 @@ TOPIC_NAME_OVERRIDES = {
     "lyft": "Lyft",
     "airbnb": "Airbnb",
     "trip": "Trips",
-    
-    # Shopping & E-commerce
     "shopping": "Shopping",
     "order": "Orders",
     "delivery": "Deliveries",
@@ -200,8 +173,6 @@ TOPIC_NAME_OVERRIDES = {
     "exchange": "Exchanges",
     "cart": "Shopping Cart",
     "checkout": "Checkout",
-    
-    # Support & Help
     "support": "Customer Support",
     "help": "Help & Support",
     "ticket": "Support Tickets",
@@ -212,8 +183,6 @@ TOPIC_NAME_OVERRIDES = {
     "review": "Reviews",
     "rating": "Ratings"
 }
-
-# Enhanced domain-based topic detection
 DOMAIN_TOPICS = {
     "linkedin.com": "LinkedIn",
     "github.com": "GitHub",
@@ -259,28 +228,13 @@ DOMAIN_TOPICS = {
     "news.ycombinator.com": "Hacker News",
     "dev.to": "Dev.to"
 }
-
-# Enhanced text cleaning with better preprocessing
 def clean_text(text):
-    # Remove URLs
     text = re.sub(r"http\S+|www\S+|https\S+", "", text, flags=re.MULTILINE)
-    
-    # Remove email addresses
     text = re.sub(r"\S+@\S+", "", text)
-    
-    # Remove phone numbers
     text = re.sub(r"\b\d{3}[-.]?\d{3}[-.]?\d{4}\b", "", text)
-    
-    # Remove special characters but keep alphanumeric and spaces
     text = re.sub(r"[^a-zA-Z0-9\s]", " ", text)
-    
-    # Convert to lowercase
     text = text.lower()
-    
-    # Remove extra whitespaces
     text = re.sub(r"\s+", " ", text)
-    
-    # Filter out stop words and short words
     words = [word for word in text.split() if 
              word not in stop_words and 
              len(word) > 2 and 
@@ -288,43 +242,29 @@ def clean_text(text):
              not word.isdigit()]
     
     return " ".join(words)
-
-# Extract domain from email address
 def extract_domain(email_from):
     if not email_from or "@" not in email_from:
         return None
-    
-    # Extract email from format like "Name <email@domain.com>"
     match = re.search(r"<([^>]+)>", email_from)
     if match:
         email = match.group(1)
     else:
         email = email_from
-    
-    # Extract domain
     try:
         domain = email.split("@")[1].lower()
         return domain
     except:
         return None
-
-# Enhanced topic name mapping with domain consideration
 def map_topic_name(keywords, email_from=None):
-    # First check if we can determine topic from sender domain
     if email_from:
         domain = extract_domain(email_from)
         if domain and domain in DOMAIN_TOPICS:
             return DOMAIN_TOPICS[domain]
-    
-    # Check keywords for topic mapping
     for word in keywords:
         cleaned = word.lower()
         for key, name in TOPIC_NAME_OVERRIDES.items():
             if key in cleaned or cleaned in key:
                 return name
-    
-    # If no direct mapping found, try to create a more meaningful name
-    # by combining related keywords
     meaningful_words = []
     for word in keywords:
         if word.lower() not in JUNK_TOPICS and len(word) > 2:
@@ -334,10 +274,7 @@ def map_topic_name(keywords, email_from=None):
         return " & ".join(meaningful_words[:3])  # Limit to 3 words max
     
     return None
-
-# Enhanced clustering with better parameters - FIXED VECTORIZER
 def get_enhanced_clustering_models(num_docs):
-    # Adjust parameters based on number of documents
     if num_docs < 20:
         min_cluster_size = 2
         n_neighbors = min(5, num_docs - 1)
@@ -347,11 +284,7 @@ def get_enhanced_clustering_models(num_docs):
     else:
         min_cluster_size = max(3, num_docs // 20)
         n_neighbors = 15
-    
-    # Use a more powerful embedding model
     embedding_model = SentenceTransformer("all-mpnet-base-v2")
-    
-    # Fine-tune UMAP parameters
     umap_model = UMAP(
         n_neighbors=n_neighbors,
         n_components=5,
@@ -359,8 +292,6 @@ def get_enhanced_clustering_models(num_docs):
         metric='cosine',
         random_state=42
     )
-    
-    # Fine-tune HDBSCAN parameters
     hdbscan_model = HDBSCAN(
         min_cluster_size=min_cluster_size,
         min_samples=1,
@@ -368,13 +299,8 @@ def get_enhanced_clustering_models(num_docs):
         cluster_selection_method='eom',
         prediction_data=True
     )
-    
-    # FIXED: Enhanced vectorizer with adaptive parameters based on document count
-    # Calculate adaptive min_df to avoid the error
     adaptive_min_df = max(1, min(2, num_docs // 50))  # At least 1, at most 2, scale with docs
     adaptive_max_df = min(0.95, 1.0 - (1.0 / num_docs))  # Ensure max_df > min_df
-    
-    # Ensure max_features doesn't exceed reasonable limits
     max_features = min(1000, num_docs * 10)
     
     vectorizer_model = CountVectorizer(
@@ -387,8 +313,6 @@ def get_enhanced_clustering_models(num_docs):
     )
     
     return embedding_model, umap_model, hdbscan_model, vectorizer_model
-
-# Post-process topics to merge similar ones
 def merge_similar_topics(topic_map, similarity_threshold=0.7):
     from difflib import SequenceMatcher
     
@@ -406,8 +330,6 @@ def merge_similar_topics(topic_map, similarity_threshold=0.7):
         for j, topic2 in enumerate(topics[i+1:], i+1):
             if topic2 in used_topics:
                 continue
-                
-            # Calculate similarity between topic names
             similarity = SequenceMatcher(None, topic1.lower(), topic2.lower()).ratio()
             
             if similarity > similarity_threshold:
@@ -452,23 +374,14 @@ def cluster_topics():
     print(f"Valid emails to cluster: {len(valid_emails)}")
 
     try:
-        # Enhanced text cleaning
         email_texts = [clean_text(e["text"]) for e in valid_emails]
-        
-        # Filter out empty texts after cleaning
         valid_indices = [i for i, text in enumerate(email_texts) if text.strip()]
         if len(valid_indices) < 2:
             return jsonify({"error": "Not enough valid text content after cleaning"}), 400
-        
-        # Keep only valid texts and corresponding emails
         email_texts = [email_texts[i] for i in valid_indices]
         valid_emails = [valid_emails[i] for i in valid_indices]
         email_ids = [e["id"] for e in valid_emails]
-
-        # Get enhanced clustering models
         embedding_model, umap_model, hdbscan_model, vectorizer_model = get_enhanced_clustering_models(len(valid_emails))
-
-        # Create BERTopic model with enhanced parameters
         topic_model = BERTopic(
             embedding_model=embedding_model,
             umap_model=umap_model,
@@ -479,11 +392,7 @@ def cluster_topics():
             verbose=True,
             nr_topics="auto"  # Let the model determine optimal number of topics
         )
-
-        # Fit and transform
         topics, probabilities = topic_model.fit_transform(email_texts)
-
-        # Build topic map with enhanced naming
         topic_map = {}
         for topic_num, eid in zip(topics, email_ids):
             meta = next((e for e in valid_emails if e["id"] == eid), {})
@@ -498,8 +407,6 @@ def cluster_topics():
                     topic_name = f"Topic {topic_num}"
             except:
                 topic_name = f"Topic {topic_num}"
-
-            # Skip junk topics
             if topic_name.lower() in JUNK_TOPICS or not topic_name.strip():
                 continue
 
@@ -511,14 +418,8 @@ def cluster_topics():
                 "date": meta.get("date"),
             }
             topic_map.setdefault(topic_name, []).append(email_obj)
-
-        # Merge similar topics
         topic_map = merge_similar_topics(topic_map)
-
-        # Sort topics by number of emails (descending)
         sorted_topics = sorted(topic_map.items(), key=lambda x: len(x[1]), reverse=True)
-        
-        # Create result with additional metadata
         result = []
         for topic, emails in sorted_topics:
             if len(emails) > 0:  # Only include topics with emails

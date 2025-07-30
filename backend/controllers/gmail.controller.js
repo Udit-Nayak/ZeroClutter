@@ -100,8 +100,6 @@ exports.fetchLargeAttachmentMails = async (req, res) => {
 
     const filter = req.query.filter || "all";
     let query = "has:attachment";
-
-    // Translate filter into Gmail query
     if (filter === ">20") {
       query += " larger:20971520"; // >20MB in bytes
     } else if (filter === "10-20") {
@@ -109,7 +107,6 @@ exports.fetchLargeAttachmentMails = async (req, res) => {
     } else if (filter === "<10") {
       query += " smaller:10485760"; // <10MB
     } else {
-      // default to >5MB for 'all'
       query += " larger:5242880";
     }
 
@@ -331,8 +328,6 @@ exports.getDuplicateEmails = async (req, res) => {
 
     let nextPageToken = null;
     const allMessages = [];
-
-    // Step 1: Fetch up to 500 message metadata
     do {
       const response = await gmail.users.messages.list({
         userId: "me",
@@ -348,8 +343,6 @@ exports.getDuplicateEmails = async (req, res) => {
     if (allMessages.length === 0) {
       return res.json([]); // No messages found
     }
-
-    // Step 2: Get full details of each message
     const detailedMessages = await Promise.all(
       allMessages.map(async (msg) => {
         const detail = await gmail.users.messages.get({
@@ -360,16 +353,12 @@ exports.getDuplicateEmails = async (req, res) => {
         return extractDetails(detail.data);
       })
     );
-
-    // Step 3: Group by from + subject + snippet
     const groups = {};
     for (const msg of detailedMessages) {
       const key = `${msg.from}||${msg.subject}||${msg.snippet}`;
       if (!groups[key]) groups[key] = [];
       groups[key].push(msg);
     }
-
-    // Step 4: Filter and prepare duplicate info
     const duplicates = Object.values(groups)
       .filter((group) => group.length > 1)
       .map((group) => {
@@ -587,13 +576,9 @@ exports.getOldUnreadEmails = async (req, res) => {
     const auth = getOAuth2Client();
     auth.setCredentials(req.user.google_tokens);
     const gmail = google.gmail({ version: "v1", auth });
-
-    // 6 months ago timestamp
     const now = new Date();
     const sixMonthsAgo = new Date(now.setMonth(now.getMonth() - 6));
     const after = Math.floor(sixMonthsAgo.getTime() / 1000);
-
-    // Gmail query: unread and older than 6 months
     const query = `is:unread before:${after}`;
 
     let oldUnreadEmails = [];

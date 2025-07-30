@@ -80,8 +80,6 @@ exports.logout = async (req, res) => {
     } else {
       console.log("❌ No valid Authorization header found");
     }
-
-    // Update last_opened_at to current timestamp before logout
     if (userId) {
       console.log("🔄 Attempting to update last_opened_at for user:", userId);
 
@@ -109,14 +107,12 @@ exports.logout = async (req, res) => {
   } catch (err) {
     console.error("💥 Logout error:", err.message);
     console.error("📍 Error stack:", err.stack);
-
-    // Even if there's an error updating the database, still clear the token
     clearToken(res);
 
     res.status(200).json({
       message: "Logged out successfully",
       warning: "Could not update last activity time",
-      error: err.message, // For debugging only - remove in production
+      error: err.message, 
     });
   }
 };

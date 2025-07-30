@@ -358,8 +358,6 @@ const emptyTrash = async (req, res) => {
 
     await drive.files.emptyTrash();
     console.log(`🗑️ Trash emptied for user: ${user.email}`);
-    
-    // Log the activity
     try {
       await pool.query(
         `INSERT INTO activity_logs (user_id, action, type, saved_bytes, created_at)

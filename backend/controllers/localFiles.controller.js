@@ -1,15 +1,11 @@
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
-
-// In-memory cache for scanned files
 let cache = {
   files: [],
   folderName: "",
   lastScan: null,
 };
-
-// Generate hash for file content comparison
 const generateHash = (fileData) => {
   try {
     if (!fileData) return null;
@@ -19,8 +15,6 @@ const generateHash = (fileData) => {
     return null;
   }
 };
-
-// Generate simple hash for file identification (fallback)
 const generateSimpleHash = (file) => {
   try {
     if (!file || !file.name) return null;
@@ -31,22 +25,16 @@ const generateSimpleHash = (file) => {
     return null;
   }
 };
-
-// Get file extension from filename
 const getFileExtension = (filename) => {
   if (!filename || typeof filename !== 'string') return 'unknown';
   const parts = filename.split('.');
   return parts.length > 1 ? parts.pop().toLowerCase() : 'unknown';
 };
-
-// Find duplicate files based on content hash
 const findDuplicates = (files) => {
   if (!Array.isArray(files)) return [];
   
   const hashMap = {};
   const duplicates = [];
-
-  // Group files by content hash
   files.forEach(file => {
     if (!file || !file.contentHash) return;
     
@@ -55,8 +43,6 @@ const findDuplicates = (files) => {
     }
     hashMap[file.contentHash].push(file);
   });
-
-  // Find groups with more than one file (duplicates)
   Object.values(hashMap).forEach(group => {
     if (group.length > 1) {
       duplicates.push(...group);
@@ -65,8 +51,6 @@ const findDuplicates = (files) => {
 
   return duplicates;
 };
-
-// Find largest files
 const findLargeFiles = (files, limit = 10) => {
   if (!Array.isArray(files)) return [];
   
@@ -75,8 +59,6 @@ const findLargeFiles = (files, limit = 10) => {
     .sort((a, b) => (b.size || 0) - (a.size || 0))
     .slice(0, limit);
 };
-
-// Format file size for display
 const formatFileSize = (bytes) => {
   if (!bytes || bytes === 0) return '0 Bytes';
   const k = 1024;
@@ -84,21 +66,15 @@ const formatFileSize = (bytes) => {
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
-
-// Validate file object
 const validateFile = (file) => {
   if (!file || typeof file !== 'object') return false;
   if (!file.name || typeof file.name !== 'string') return false;
   if (typeof file.size !== 'number' || file.size < 0) return false;
   return true;
 };
-
-// Main scan function that processes file metadata from frontend
 const scanSelectedFolder = (req, res) => {
   try {
     const { files, folderName } = req.body;
-
-    // Validate input
     if (!files || !Array.isArray(files) || files.length === 0) {
       return res.status(400).json({ 
         error: "No files data provided",
@@ -107,12 +83,9 @@ const scanSelectedFolder = (req, res) => {
     }
 
     console.log(`Processing ${files.length} files from folder: ${folderName || 'Unknown'}`);
-
-    // Process and validate file data
     const processedFiles = files
       .filter(file => validateFile(file))
       .map(file => {
-        // Ensure all required fields are present with fallbacks
         const processedFile = {
           name: file.name,
           fullPath: file.fullPath || file.name,
@@ -132,13 +105,9 @@ const scanSelectedFolder = (req, res) => {
         message: "No valid files were found in the selected folder"
       });
     }
-
-    // Update cache
     cache.files = processedFiles;
     cache.folderName = folderName || 'Unknown Folder';
     cache.lastScan = new Date();
-
-    // Find duplicates and large files
     const duplicates = findDuplicates(processedFiles);
     const largest = findLargeFiles(processedFiles, 10);
 
@@ -170,8 +139,6 @@ const scanSelectedFolder = (req, res) => {
     });
   }
 };
-
-// Get duplicates from cache
 const getDuplicates = (req, res) => {
   try {
     if (!cache.files.length) {
@@ -182,8 +149,6 @@ const getDuplicates = (req, res) => {
     }
 
     const duplicates = findDuplicates(cache.files);
-    
-    // Group duplicates by hash for better organization
     const duplicateGroups = {};
     duplicates.forEach(file => {
       if (!duplicateGroups[file.contentHash]) {
@@ -209,8 +174,6 @@ const getDuplicates = (req, res) => {
     });
   }
 };
-
-// Get large files from cache
 const getLargeFiles = (req, res) => {
   try {
     if (!cache.files.length) {
@@ -244,8 +207,6 @@ const getLargeFiles = (req, res) => {
     });
   }
 };
-
-// Delete file (Note: Limited by browser security for File System Access API)
 const deleteFile = (req, res) => {
   try {
     const { fullPath } = req.body;
@@ -256,13 +217,9 @@ const deleteFile = (req, res) => {
         message: "Please provide a valid file path"
       });
     }
-
-    // Check if we're dealing with File System Access API files (browser-based)
-    // or traditional file system files (server-based)
     const isTraditionalPath = path.isAbsolute(fullPath) && (fullPath.includes('\\') || fullPath.startsWith('/'));
     
     if (isTraditionalPath) {
-      // Traditional server-side file deletion
       if (!fs.existsSync(fullPath)) {
         return res.status(404).json({ 
           error: "File not found",
@@ -271,18 +228,13 @@ const deleteFile = (req, res) => {
       }
 
       try {
-        // Create backup info before deletion
         const stats = fs.statSync(fullPath);
         const fileInfo = {
           path: fullPath,
           size: stats.size,
           deletedAt: new Date().toISOString()
         };
-
-        // Delete the actual file
         fs.unlinkSync(fullPath);
-        
-        // Remove from cache
         const initialLength = cache.files.length;
         cache.files = cache.files.filter(f => f.fullPath !== fullPath);
         
@@ -304,8 +256,6 @@ const deleteFile = (req, res) => {
         });
       }
     } else {
-      // Browser-based File System Access API files
-      // Due to browser security restrictions, we can only remove from cache
       const initialLength = cache.files.length;
       const fileToRemove = cache.files.find(f => f.fullPath === fullPath);
       cache.files = cache.files.filter(f => f.fullPath !== fullPath);
@@ -336,8 +286,6 @@ const deleteFile = (req, res) => {
     });
   }
 };
-
-// Get scan status and statistics
 const getScanStatus = (req, res) => {
   try {
     const duplicateCount = cache.files.length > 0 ? findDuplicates(cache.files).length : 0;
@@ -363,8 +311,6 @@ const getScanStatus = (req, res) => {
     });
   }
 };
-
-// Clear cache
 const clearCache = (req, res) => {
   try {
     const previousCount = cache.files.length;
@@ -392,8 +338,6 @@ const clearCache = (req, res) => {
     });
   }
 };
-
-// Get all files from cache with pagination
 const getAllFiles = (req, res) => {
   try {
     if (!cache.files.length) {
@@ -453,7 +397,6 @@ module.exports = {
   getScanStatus,
   clearCache,
   getAllFiles,
-  // Export utility functions for testing
   findDuplicates,
   findLargeFiles,
   generateHash,

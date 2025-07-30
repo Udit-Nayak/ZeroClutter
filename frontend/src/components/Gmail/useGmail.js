@@ -1,4 +1,3 @@
-// useGmail.js
 import { useState } from "react";
 import axios from "axios";
 
@@ -29,6 +28,6 @@ export default function useGmail(token) {
     fetchMails,
     setError,
     setLoading,
-    setMails, // exposed so GmailDashboard can use it if needed
+    setMails,
   };
 }

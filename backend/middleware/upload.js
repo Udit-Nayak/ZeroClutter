@@ -2,27 +2,20 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 const crypto = require("crypto");
-
-// Create uploads directory if it doesn't exist
 const uploadDir = path.join(__dirname, "..", "uploads");
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
   console.log(`Created uploads directory: ${uploadDir}`);
 }
-
-// Configure multer storage
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
     try {
-      // Create unique filename with timestamp
       const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
       const ext = path.extname(file.originalname);
       const baseName = path.basename(file.originalname, ext);
-      
-      // Sanitize filename - remove dangerous characters
       const sanitizedBaseName = baseName.replace(/[^a-zA-Z0-9_-]/g, '_');
       const filename = `${sanitizedBaseName}_${uniqueSuffix}${ext}`;
       
@@ -32,21 +25,14 @@ const storage = multer.diskStorage({
     }
   },
 });
-
-// File filter to prevent certain file types (security measure)
 const fileFilter = (req, file, cb) => {
   try {
-    // Get file extension
     const ext = path.extname(file.originalname).toLowerCase();
-    
-    // Blocked extensions for security
     const blockedExtensions = ['.exe', '.bat', '.cmd', '.com', '.pif', '.scr', '.vbs', '.js'];
     
     if (blockedExtensions.includes(ext)) {
       return cb(new Error(`File type ${ext} is not allowed for security reasons`), false);
     }
-    
-    // Check MIME type
     const allowedMimeTypes = [
       'image/', 'video/', 'audio/', 'text/', 'application/pdf', 
       'application/msword', 'application/vnd.openxmlformats-officedocument',
@@ -60,7 +46,6 @@ const fileFilter = (req, file, cb) => {
     
     if (!isAllowedMimeType && ext !== '') {
       console.warn(`File ${file.originalname} has unrecognized MIME type: ${file.mimetype}`);
-      // Allow but log warning for monitoring
     }
     
     cb(null, true);
@@ -68,8 +53,6 @@ const fileFilter = (req, file, cb) => {
     cb(err, false);
   }
 };
-
-// Configure multer with options
 const upload = multer({ 
   storage: storage,
   fileFilter: fileFilter,
@@ -79,13 +62,9 @@ const upload = multer({
     fieldSize: 50 * 1024 * 1024 // 50MB field size limit (increased for metadata)
   }
 });
-
-// Generate content hash for uploaded file
 const generateFileContentHash = async (filePath) => {
   try {
     const fileStats = fs.statSync(filePath);
-    
-    // For large files, use metadata + sample content
     if (fileStats.size > 100 * 1024 * 1024) { // 100MB
       const sampleSize = 64 * 1024; // 64KB sample
       const buffer = Buffer.alloc(sampleSize);
@@ -97,20 +76,16 @@ const generateFileContentHash = async (filePath) => {
       const combinedData = Buffer.concat([Buffer.from(metadataHash), buffer]);
       return crypto.createHash('sha256').update(combinedData).digest('hex').substring(0, 20);
     } else {
-      // For smaller files, hash entire content
       const fileBuffer = fs.readFileSync(filePath);
       return crypto.createHash('sha256').update(fileBuffer).digest('hex').substring(0, 20);
     }
   } catch (error) {
     console.error('Error generating file content hash:', error);
-    // Fallback to metadata hash
     const stats = fs.statSync(filePath);
     const fallbackData = `${path.basename(filePath)}-${stats.size}-${stats.mtime.getTime()}`;
     return crypto.createHash('md5').update(fallbackData).digest('hex').substring(0, 20);
   }
 };
-
-// Convert uploaded files to LocalDashboard format
 const convertUploadedFilesToLocalFormat = async (files, folderName = "Uploaded Files") => {
   const convertedFiles = [];
   
@@ -133,21 +108,16 @@ const convertUploadedFilesToLocalFormat = async (files, folderName = "Uploaded F
       convertedFiles.push(convertedFile);
     } catch (error) {
       console.error(`Error processing uploaded file ${file.originalname}:`, error);
-      // Continue with other files even if one fails
     }
   }
   
   return convertedFiles;
 };
-
-// Get file extension from filename
 const getFileExtension = (filename) => {
   if (!filename || typeof filename !== 'string') return 'unknown';
   const ext = filename.split('.').pop();
   return ext === filename ? 'unknown' : ext.toLowerCase();
 };
-
-// Middleware to handle upload errors
 const handleUploadError = (error, req, res, next) => {
   if (error instanceof multer.MulterError) {
     console.error("Multer error:", error);
@@ -197,8 +167,6 @@ const handleUploadError = (error, req, res, next) => {
   
   next();
 };
-
-// Clean up uploaded files (utility function)
 const cleanupUploadedFiles = (files) => {
   if (!files || !Array.isArray(files)) {
     console.warn("cleanupUploadedFiles: Invalid files parameter");
@@ -221,8 +189,6 @@ const cleanupUploadedFiles = (files) => {
   
   console.log(`Cleaned up ${cleanedCount} uploaded files`);
 };
-
-// Clean up old uploaded files (run periodically)
 const cleanupOldFiles = (maxAge = 24 * 60 * 60 * 1000) => { // 24 hours default
   try {
     if (!fs.existsSync(uploadDir)) {
@@ -256,8 +222,6 @@ const cleanupOldFiles = (maxAge = 24 * 60 * 60 * 1000) => { // 24 hours default
     console.error('Error during cleanup process:', err);
   }
 };
-
-// Get upload directory info
 const getUploadDirInfo = () => {
   try {
     if (!fs.existsSync(uploadDir)) {
@@ -288,8 +252,6 @@ const getUploadDirInfo = () => {
     return { exists: false, files: 0, totalSize: 0, error: err.message };
   }
 };
-
-// Format file size for display
 const formatFileSize = (bytes) => {
   if (!bytes || bytes === 0) return '0 Bytes';
   const k = 1024;
@@ -297,14 +259,10 @@ const formatFileSize = (bytes) => {
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
-
-// Schedule cleanup every 2 hours (less frequent to reduce load)
 const cleanupInterval = setInterval(() => {
   console.log("Running scheduled cleanup of old uploaded files...");
   cleanupOldFiles();
 }, 2 * 60 * 60 * 1000);
-
-// Graceful shutdown cleanup
 process.on('SIGINT', () => {
   console.log('Clearing cleanup interval...');
   clearInterval(cleanupInterval);

@@ -2,16 +2,12 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import "./index.css";
-
-// Import components
 import App from "./App";
 import MainDashboard from "./components/MainDashboard";
 import ReportsPage from "./components/ReportsPage";
 import GmailDashboard from "./components/Gmail/GmailDashboard";
 import DriveDashboard from "./components/Drive/DriveDashboard";
 import LocalDashboard from "./components/Local/LocalDashboard";
-
-// Error Boundary Component
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -78,9 +74,6 @@ class ErrorBoundary extends React.Component {
     return this.props.children;
   }
 }
-
-
-// Protected Route Component
 const ProtectedRoute = ({ children }) => {
   const params = new URLSearchParams(window.location.search);
   const token = params.get("token");
@@ -91,8 +84,6 @@ const ProtectedRoute = ({ children }) => {
   
   return children;
 };
-
-// Not Found Component
 const NotFound = () => (
   <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
     <div className="max-w-md w-full text-center">
@@ -121,8 +112,6 @@ const NotFound = () => (
     </div>
   </div>
 );
-
-// App Router Component
 const AppRouter = () => {
   return (
     <ErrorBoundary>
@@ -188,23 +177,15 @@ const AppRouter = () => {
     </ErrorBoundary>
   );
 };
-
-// Initialize React App
 const root = ReactDOM.createRoot(document.getElementById("root"));
-
-// Add performance monitoring
 if (process.env.NODE_ENV === 'development') {
   console.log('🚀 ZeroClutter App starting in development mode');
 }
-
-// Render the app
 root.render(
   <React.StrictMode>
     <AppRouter />
   </React.StrictMode>
 );
-
-// Service Worker Registration (optional)
 if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js')
@@ -216,16 +197,9 @@ if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
       });
   });
 }
-
-// Analytics and monitoring (optional)
 if (process.env.NODE_ENV === 'production') {
-  // Add your analytics code here
-  // Example: Google Analytics, Mixpanel, etc.
 }
-
-// Performance monitoring
 if (process.env.NODE_ENV === 'development') {
-  // Log performance metrics in development
   window.addEventListener('load', () => {
     if ('performance' in window) {
       const perfData = performance.getEntriesByType('navigation')[0];
@@ -237,14 +211,10 @@ if (process.env.NODE_ENV === 'development') {
     }
   });
 }
-
-// Global error handling
 window.addEventListener('error', (event) => {
   console.error('Global error:', event.error);
-  // You can send errors to your monitoring service here
 });
 
 window.addEventListener('unhandledrejection', (event) => {
   console.error('Unhandled promise rejection:', event.reason);
-  // You can send errors to your monitoring service here
 });

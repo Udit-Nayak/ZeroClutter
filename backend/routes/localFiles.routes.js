@@ -11,12 +11,8 @@ const {
 } = require("../controllers/localFiles.controller");
 
 const router = express.Router();
-
-// Middleware for JSON parsing with increased limits for file metadata
 router.use(express.json({ limit: '100mb' }));
 router.use(express.urlencoded({ extended: true, limit: '100mb' }));
-
-// Add request logging middleware
 router.use((req, res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`, {
     body: req.method === 'POST' ? `${Object.keys(req.body).length} keys` : 'N/A',
@@ -24,11 +20,8 @@ router.use((req, res, next) => {
   });
   next();
 });
-
-// Route for scanning folder (handles JSON data from File System Access API)
 router.post("/scan", (req, res, next) => {
   try {
-    // Validate request body
     if (!req.body) {
       return res.status(400).json({
         error: "No request body provided",
@@ -46,8 +39,6 @@ router.post("/scan", (req, res, next) => {
     });
   }
 });
-
-// Route for traditional file upload scanning (if needed)
 router.post("/upload-scan", upload.array("files", 1000), handleUploadError, (req, res) => {
   try {
     if (!req.files || req.files.length === 0) {
@@ -58,8 +49,6 @@ router.post("/upload-scan", upload.array("files", 1000), handleUploadError, (req
     }
 
     console.log(`Processing ${req.files.length} uploaded files`);
-
-    // Convert uploaded files to the expected format
     const files = req.files.map(file => {
       const crypto = require('crypto');
       return {
@@ -74,8 +63,6 @@ router.post("/upload-scan", upload.array("files", 1000), handleUploadError, (req
           .substring(0, 16)
       };
     });
-
-    // Use the same scan logic
     req.body = { files, folderName: "Uploaded Files" };
     scanSelectedFolder(req, res);
   } catch (err) {
@@ -87,8 +74,6 @@ router.post("/upload-scan", upload.array("files", 1000), handleUploadError, (req
     });
   }
 });
-
-// Route to get all files (with pagination)
 router.get("/files", (req, res) => {
   try {
     getAllFiles(req, res);
@@ -100,8 +85,6 @@ router.get("/files", (req, res) => {
     });
   }
 });
-
-// Route to get duplicate files
 router.get("/duplicates", (req, res) => {
   try {
     getDuplicates(req, res);
@@ -113,8 +96,6 @@ router.get("/duplicates", (req, res) => {
     });
   }
 });
-
-// Route to get large files
 router.get("/large", (req, res) => {
   try {
     getLargeFiles(req, res);
@@ -126,8 +107,6 @@ router.get("/large", (req, res) => {
     });
   }
 });
-
-// Route to get scan status
 router.get("/status", (req, res) => {
   try {
     getScanStatus(req, res);
@@ -139,8 +118,6 @@ router.get("/status", (req, res) => {
     });
   }
 });
-
-// Route to delete a file
 router.delete("/delete", (req, res) => {
   try {
     if (!req.body || !req.body.fullPath) {
@@ -158,8 +135,6 @@ router.delete("/delete", (req, res) => {
     });
   }
 });
-
-// Route to clear cache
 router.delete("/clear", (req, res) => {
   try {
     clearCache(req, res);
@@ -171,8 +146,6 @@ router.delete("/clear", (req, res) => {
     });
   }
 });
-
-// Health check route
 router.get("/health", (req, res) => {
   res.json({
     success: true,
@@ -181,12 +154,8 @@ router.get("/health", (req, res) => {
     version: "1.0.0"
   });
 });
-
-// Error handling middleware for this router
 router.use((error, req, res, next) => {
   console.error("Local files route error:", error);
-  
-  // Handle specific error types
   if (error.type === 'entity.too.large') {
     return res.status(413).json({
       error: "Request too large",
@@ -202,8 +171,6 @@ router.use((error, req, res, next) => {
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
-  
-  // Generic error response
   const statusCode = error.statusCode || error.status || 500;
   res.status(statusCode).json({
     error: error.name || "Internal server error",

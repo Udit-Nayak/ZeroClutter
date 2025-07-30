@@ -43,7 +43,6 @@ router.get("/callback", async (req, res) => {
 
     let user;
     if (result.rowCount === 0) {
-      // User doesn't exist, so create one
       const insertResult = await pool.query(
         `INSERT INTO users (email, username, avatar, google_tokens) 
          VALUES ($1, $2, $3, $4) RETURNING *`,
@@ -52,7 +51,6 @@ router.get("/callback", async (req, res) => {
       user = insertResult.rows[0];
       console.log("🆕 New user created via Google OAuth:", email);
     } else {
-      // User already exists, update their tokens and profile info
       user = result.rows[0];
       await pool.query(
         `UPDATE users SET google_tokens = $1, username = $2, avatar = $3 WHERE id = $4`,

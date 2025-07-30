@@ -13,8 +13,6 @@ import {
 const ReportsPage = () => {
   const [reportData, setReportData] = useState(null);
   const [loading, setLoading] = useState(true);
-
-  // Mock data for demonstration - replace with actual API call
   useEffect(() => {
     const mockData = {
       totalUsage: 2147483648, // 2GB in bytes
@@ -33,8 +31,6 @@ const ReportsPage = () => {
 
   const toMB = (bytes) => (bytes ? (bytes / 1024 / 1024).toFixed(1) : 0);
   const toGB = (bytes) => (bytes ? (bytes / 1024 / 1024 / 1024).toFixed(2) : 0);
-
-  // Inline styles for better compatibility
   const gradientBg = {
     background: 'linear-gradient(135deg, #0f172a 0%, #581c87 50%, #0f172a 100%)',
     minHeight: '100vh',

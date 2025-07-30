@@ -21,8 +21,6 @@ import {
   MessageSquare,
   Filter
 } from "lucide-react";
-
-// Enhanced GmailToolbar component
 function GmailToolbar({
   onFetch,
   onFetchLarge,
@@ -380,8 +378,6 @@ function GmailDashboard({ token: propToken }) {
       setError("No token found.");
     }
   }, [propToken, setError]);
-
-  // All the existing handler functions remain the same
   const handleFetchTopicClusters = async () => {
     if (isFetchingClusterRef.current) {
       console.warn("🔒 Already fetching cluster data. Skipping re-call.");
@@ -707,8 +703,6 @@ function GmailDashboard({ token: propToken }) {
       allMailIds.every((id) => selectedMails.includes(id)),
     [allMailIds, selectedMails]
   );
-
-  // Enhanced button styles
   const actionButtonStyle = {
     display: "inline-flex",
     alignItems: "center",

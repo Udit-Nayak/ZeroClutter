@@ -114,8 +114,6 @@ const MainDashboard = () => {
           res.statusText
         );
         const errorData = await res.json();
-
-        // Use fallback data if API fails but still has fallback data
         if (errorData.data) {
           console.log("Using fallback storage data");
           setStorageData(errorData.data);
@@ -125,8 +123,6 @@ const MainDashboard = () => {
 
       const data = await res.json();
       console.log("Storage quota data received:", data);
-
-      // Validate data structure before setting
       if (data && data.total && typeof data.total.percentage === "number") {
         setStorageData(data);
       } else {
@@ -172,8 +168,6 @@ const MainDashboard = () => {
       if (!res.ok) throw new Error("Failed to fetch spam emails");
 
       const data = await res.json();
-
-      // Calculate total size (approximate 25KB per spam email - typically smaller than promotional)
       const approximateSize = data.length * 25 * 1024; // 25KB per email
 
       const formatBytes = (bytes) => {
@@ -212,7 +206,6 @@ const MainDashboard = () => {
       console.error("Error fetching old unread stats:", err);
     }
   }, [token]);
-  // NEW FUNCTION: Fetch duplicate statistics
   const fetchDuplicateStats = useCallback(async () => {
     if (!token) return;
 
@@ -256,8 +249,6 @@ const MainDashboard = () => {
       if (!res.ok) throw new Error("Failed to fetch promotional emails");
 
       const data = await res.json();
-
-      // Calculate total size (approximate 50KB per promotional email)
       const approximateSize = data.length * 50 * 1024; // 50KB per email
 
       const formatBytes = (bytes) => {
@@ -498,7 +489,6 @@ const MainDashboard = () => {
           {storageData.total.percentage > 75 && (
             <button
               onClick={() => {
-                // Navigate to cleanup sections
                 setActiveTab("gmail");
               }}
               className={`flex items-center justify-center w-full py-3 px-4 text-sm text-white rounded-lg transition-all duration-200 font-medium shadow-sm hover:shadow-md ${
@@ -529,7 +519,6 @@ const MainDashboard = () => {
     fetchSpamStats,
     fetchOldUnreadStats,
   ]);
-  // NEW FUNCTION: Handle Drive Rescan
   const handleRescanDriveFiles = async () => {
     if (!token) return;
 
@@ -550,8 +539,6 @@ const MainDashboard = () => {
       );
 
       if (!response.ok) throw new Error("Failed to rescan drive");
-
-      // Refresh user profile and duplicate stats after rescan
       await Promise.all([
         fetchUserProfile(),
         fetchDuplicateStats(),
@@ -619,13 +606,10 @@ const MainDashboard = () => {
       fetchUserProfile();
       fetchStorageQuota();
       fetchDuplicateStats();
-      // Fetch duplicate stats
     } else {
       setLoading(false);
     }
   }, [token, fetchUserProfile, fetchDuplicateStats, fetchStorageQuota]);
-
-  // Update stats when duplicateStats or user changes
   useEffect(() => {
     if (user || duplicateStats.duplicateCount > 0) {
       fetchUserStats();
@@ -1201,7 +1185,6 @@ const MainDashboard = () => {
                             <p className="text-xs text-blue-700">
                               Can save approximately{" "}
                               {
-                                // Calculate total potential savings
                                 (() => {
                                   const promotionalSize =
                                     promotionalStats.totalSize || 0;

@@ -1,4 +1,3 @@
-// src/components/Drive/DriveToolbar.jsx
 import React from "react";
 
 function DriveToolbar({ onList, onDuplicate, onRescan, onTrash, onReports }) {

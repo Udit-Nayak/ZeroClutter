@@ -1,4 +1,3 @@
-// src/components/Gmail/GmailLoader.jsx
 import React from "react";
 
 function GmailLoader({ loading, isAuthenticated, mails }) {

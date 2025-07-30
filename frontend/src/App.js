@@ -18,7 +18,6 @@ function App() {
   const [token, setToken] = useState(null);
 
   useEffect(() => {
-    // Check authentication status
     const params = new URLSearchParams(window.location.search);
     const urlToken = params.get("token");
     if (urlToken) {

@@ -1,4 +1,3 @@
-// src/components/Drive/FilterPanel.jsx
 import React from "react";
 
 function FilterPanel({ filters, onChange, onApply }) {
