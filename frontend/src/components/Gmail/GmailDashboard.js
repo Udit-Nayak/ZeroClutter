@@ -298,7 +298,7 @@ function GmailToolbar({
           }}>
             <div>
               <label style={{ 
-                display: "block", 
+                display: "flex", 
                 marginBottom: "0.5rem", 
                 fontSize: "0.875rem", 
                 fontWeight: "500",
@@ -325,7 +325,7 @@ function GmailToolbar({
 
             <div>
               <label style={{ 
-                display: "block", 
+                display: "flex", 
                 marginBottom: "0.5rem", 
                 fontSize: "0.875rem", 
                 fontWeight: "500",
